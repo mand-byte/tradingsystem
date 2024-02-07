@@ -1,0 +1,49 @@
+{
+    "DB": {
+        "DB_HOST": "",
+        "DB_PORT": 3306,
+        "DB_USER": "",
+        "DB_PASS": "",
+        "DB_NAME": ""
+    },
+    "TG": {
+        "TG_TOKEN": "",
+        "TG_API_ID": "",
+        "TG_API_HASH": "",
+        "------CHAT_ID------": "bot主动发消息的id，群id或用户id",
+        "CHAT_ID": 0
+    },
+    "TG_report_err": false,
+    "TG_report_open": false,
+    "TG_report_close": false,
+    "------LEVERAGE------": "交易所设置的杠杆倍数",
+    "LEVERAGE": 10,
+    "------DATA_REFRESH_TIME------": "账户及持仓信息刷新时间",
+    "DATA_REFRESH_TIME": 30,
+    "Martin": {
+        "------MAX_HUOXING_COUNT------": "单个交易所火星马丁同一方向最大同时开仓数量(小于等于0为有多少信号开多少单)",
+        "MAX_HUOXING_COUNT": 4,
+        "------HUOXING_EXCEPT_NUM------": "马丁多少以后,上面MAX_HUOXING_COUNT限制无效(与上面限制搭配使用)",
+        "HUOXING_EXCEPT_NUM": 2,
+        "------HUOXING_INVEST_USE_RATIO------": "是否开启马丁按账户资金比例投入",
+        "HUOXING_INVEST_USE_RATIO": false,
+        "------HUOXING_RATIO_INVEST------": "马丁按账户资金比例投入值，实际投入usdt=total*ratio*math.pow(1.618,n)",
+        "HUOXING_RATIO_INVEST": 0.0081,
+        "------HUOXING_INVERST_MONEY------": "#马丁固定投入金额",
+        "HUOXING_FIXED_INVERST": [
+            15.0,
+            26.18,
+            42.36,
+            68.54
+        ]
+    },
+    "Trend": {
+        "------TREND_INVEST_USE_RATIO------": "是否开启趋势按账户资金比例投入",
+        "TREND_INVEST_USE_RATIO": true,
+        "------TREND_RATIO_INVEST------": "趋势下单按账户资金比例投入值，实际投入usdt=total*ratio",
+        "TREND_RATIO_INVEST": 0.1,
+        "TREND_FIXED_INVEST": 200,
+        "------TREND_TP_RATIO------": "趋势下单take profit 比例，设为0 只用tv信号平仓",
+        "TREND_TP_RATIO": 0.018
+    }
+}
