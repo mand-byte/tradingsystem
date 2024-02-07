@@ -79,7 +79,7 @@ async def make_tv_order(data):
                         tp = round(float(data.price)*(1+DataStore.json_conf['Trend']['TREND_TP_RATIO']), 1)
                     else:
                         tp = round(float(data.price)*(1-DataStore.json_conf['Trend']['TREND_TP_RATIO']), 1)
-                for _, value in DataStore.controller_list.items():
+                for id, value in DataStore.controller_list.items():
                     try:
                         if DataStore.json_conf['Trend']['TREND_INVEST_USE_RATIO']:
 
