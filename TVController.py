@@ -37,16 +37,16 @@ async def make_tv_order(data):
                         if DataStore.json_conf['Martin']['MAX_HUOXING_COUNT'] > 0:
                             sy = utils.get_swap_symbol(symbol, value.exdata.ex)
                             contian = False
-                            count = 0
+                            count = set()
                             try:
-                                for i in DataStore.swap_positions[id]:
+                                for i in DataStore.order_info[id]:
                                     if i.isswap and i.symbol == sy and i.posSide == data.market_position:
                                         contian = True
                                         break
-                                    if i.isswap and i.symbol != sy and i.posSide == data.market_position:
-                                        count = count+1
+                                    if i.isswap and i.symbol != sy and i.posSide == data.market_position and i.orderFrom==Const.ORDER_FROM_HUOXING:
+                                        count.add(i.symbol)
                                 # 马丁同一方向最大只开n种不同标的单，除非已经开过单 或是马丁m以上
-                                if (contian == False and count < DataStore.json_conf['Martin']['MAX_HUOXING_COUNT']) or contian or num > DataStore.json_conf['Martin']['HUOXING_EXCEPT_NUM']:
+                                if (contian == False and len(count) < DataStore.json_conf['Martin']['MAX_HUOXING_COUNT']) or contian or num > DataStore.json_conf['Martin']['HUOXING_EXCEPT_NUM']:
                                     # 修改之前订单的止盈止损
                                     await value.set_swap_sltp_by_pos(symbol, data.market_position, 0, tp)
                                     if DataStore.json_conf['Martin']['HUOXING_INVEST_USE_RATIO']:
