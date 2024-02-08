@@ -39,7 +39,7 @@ async def make_tv_order(data):
                             contian = False
                             count = 0
                             try:
-                                for i in DataStore.order_info[id]:
+                                for i in DataStore.swap_positions[id]:
                                     if i.isswap and i.symbol == sy and i.posSide == data.market_position:
                                         contian = True
                                         break
