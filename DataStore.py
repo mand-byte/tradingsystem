@@ -88,6 +88,10 @@ async def set_ex_status(data:SetExStatusRequest):
             del swap_account[data.id]
             del spot_account[data.id]
             del order_info[data.id]
+            for i in ex_list:
+                if i.id==data.id:
+                    ex_list.remove(i)
+                    break
         if data.status==2:
             return await ExchangeDao.del_physical(data.id)
         elif data.status==1:

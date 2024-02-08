@@ -15,10 +15,9 @@ async def Run():
         DataStore.controller_list[ex.id] = instance
         asyncio.create_task(instance.init())
     asyncio.create_task(TGBot.start())
-    # asyncio.create_task(test())
     while True:
         schedule.run_pending()
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.1)
 
    
 
