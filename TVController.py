@@ -19,6 +19,8 @@ async def make_tv_order(data):
             else:
                 posside = 'short'
             for _, value in DataStore.controller_list.items():
+                if value.exdata.no_close==True:
+                            continue
                 try:
                     await value.close_swap_by_pos(symbol, posside)
                 except:
@@ -34,6 +36,8 @@ async def make_tv_order(data):
                     num = int(match[0])
                     tp = float(match[1])
                     for id, value in DataStore.controller_list.items():
+                        if value.exdata.no_open==True:
+                            continue
                         if DataStore.json_conf['Martin']['MAX_HUOXING_COUNT'] > 0:
                             sy = utils.get_swap_symbol(symbol, value.exdata.ex)
                             contian = False
@@ -97,6 +101,8 @@ async def make_tv_order(data):
         else:
             # 平掉单个仓位
             for id, con in DataStore.controller_list.items():
+                if con.exdata.no_close==True:
+                            continue
                 s = utils.get_swap_symbol(symbol, con.exdata.ex)
                 for v in DataStore.order_info[id]:
                     if v.isswap and s == v.symbol and v.status == Const.ORDER_STATUS_FILLED and v.posSide == data.market_position:

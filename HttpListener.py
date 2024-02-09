@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import DataStore
 from OrderInfoDao import OrderInfoDB
-from RequestObject import AddExRequest, CancelOrderRequest, ClosePosRequest, CloseStrategyOrder, SetExStatusRequest, LoginRequest, MakeOrderRequest, ModifySlTp, SetLeverageRequest, SetMartinRequest, SetTGRequest, SetTrendRequest, StrategyOrderRequest, TvNotificationRequest
+from RequestObject import AddExRequest, CancelOrderRequest, ClosePosRequest, CloseStrategyOrder, SetExSingalRequest, SetExStatusRequest, LoginRequest, MakeOrderRequest, ModifySlTp, SetLeverageRequest, SetMartinRequest, SetTGRequest, SetTrendRequest, StrategyOrderRequest, TvNotificationRequest
 from StatisticsDao import query_total_by_range
 import StrategyLogic
 import UserDao
@@ -334,6 +334,15 @@ async def set_exchange(data: SetExStatusRequest, token: str = Depends(get_token)
         return JSONResponse(status_code=Status.UserUnauthorized.value, content={"message": "用户权限不足"})
     
     result=await DataStore.set_ex_status(data)   
+    return {'data':result}
+
+@app.post('/ts/api/set-ex-tvsingal')
+async def set_exchange_tvsginal(data: SetExSingalRequest, token: str = Depends(get_token)):
+    user = await verify_token(token)
+    if user.privilege <= 1:
+        return JSONResponse(status_code=Status.UserUnauthorized.value, content={"message": "用户权限不足"})
+    
+    result=await DataStore.set_ex_tvsingal(data)   
     return {'data':result}
 
 @app.post('/ts/api/add-ex')

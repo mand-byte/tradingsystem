@@ -414,17 +414,17 @@ class BinanceController(Controller):
                 status_code=Status.ExchangeError.value, detail=msg)
         if  order_info.status==Const.ORDER_STATUS_FILLED:
             if len(info.sl_id)>0:
+                await self.sdk.cancel_swap_order(info.symbol,info.sl_id)
                 info.sl=0
                 info.sl_id=''
                 info.sltp_status=Const.SLTP_STATUS_NONE
                 await DataStore.update_orderinfo(i)
-                await self.sdk.cancel_swap_order(info.symbol,info.sl_id)
             if len(info.tp_id)>0:
+                await self.sdk.cancel_swap_order(info.symbol,info.tp_id)
                 info.tp=0
                 info.tp_id=''
                 info.sltp_status=Const.SLTP_STATUS_NONE
                 await DataStore.update_orderinfo(i)
-                await self.sdk.cancel_swap_order(info.symbol,info.tp_id)
             if sl>0:
                 result=await self.sdk.set_swap_sl(info.symbol,info.size,info.posSide,sl,False)
                 if isinstance(result,str):

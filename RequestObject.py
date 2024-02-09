@@ -83,6 +83,12 @@ class SetExStatusRequest(BaseModel):
     #false为禁用 true为物理删除 
     status:int
 
+class SetExSingalRequest(BaseModel):
+    id:int
+    
+    no_open:int
+    no_close:int
+
 class SetMartinRequest(BaseModel):
     use_ratio:bool
     ratio:Optional[float]

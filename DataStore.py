@@ -4,7 +4,7 @@ import importlib
 
 from fastapi import HTTPException
 
-from RequestObject import AddExRequest, SetExStatusRequest, SetMartinRequest, SetTrendRequest
+from RequestObject import AddExRequest, SetExSingalRequest, SetExStatusRequest, SetMartinRequest, SetTrendRequest
 import StatisticsDao
 from typing import Dict, Iterable, List
 import schedule
@@ -129,6 +129,13 @@ async def set_ex_status(data:SetExStatusRequest):
         raise HTTPException(status_code=Status.ParamsError.value,
                                 detail=f"设置交易所状态信息错误 err={e}")
 
+async def set_ex_tvsingal(data:SetExSingalRequest):
+    result=await ExchangeDao.set_tv_singal(data.id,data.no_open,data.no_close)
+    if result and data.id in controller_list:
+        controller_list[data.id].exdata.no_close=data.no_close
+        controller_list[data.id].exdata.no_open=data.no_open
+    return result
+    
 def update_martin_setting(data:SetMartinRequest):
     if data.use_ratio:
         json_conf['Martin']['HUOXING_INVEST_USE_RATIO']=data.use_ratio

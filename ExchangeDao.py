@@ -11,22 +11,26 @@ class ExchangeDb:
         self.apikey = kwargs.get('apikey','')
         self.api_secret = kwargs.get('api_secret','')
         self.api_password = kwargs.get('api_password','')
+        self.no_open = kwargs.get('no_open',False)
+        self.no_close = kwargs.get('no_close',False)
         self.deleted = kwargs.get('deleted',False)
     def to_json(self):
         return {
             "id": self.id,
             "ex": self.ex,
             "account": self.account,
+            'no_open':self.no_open,
+            'no_close':self.no_close,
             'deleted':self.deleted
         }
 async def insert(db:ExchangeDb):
     from DataStore import db_pool
     insert_query = (
-        "INSERT INTO exchange_info (ex, account, apikey, api_secret, api_password, deleted) "
-        "VALUES (%s, %s, %s, %s, %s, %s)"
+        "INSERT INTO exchange_info (ex, account, apikey, api_secret, api_password, deleted,no_open,no_close) "
+        "VALUES (%s, %s, %s, %s, %s, %s,%s,%s)"
     )
     parameters = (
-        db.ex, db.account, db.apikey, db.api_secret, db.api_password, db.deleted
+        db.ex, db.account, db.apikey, db.api_secret, db.api_password, db.deleted,db.no_open,db.no_close
     )
     try:
         async with db_pool.acquire() as conn:
@@ -67,7 +71,22 @@ async def delete_soft(id: int):
     except Exception as e:
         logger.error(f"exchange_info 表软删除错误: {e} id={id}")
         return False
-
+    
+async def set_tv_singal(id:int,no_open:bool,no_close:bool):
+    from DataStore import db_pool
+    update_query = "UPDATE exchange_info SET no_open = %s, no_close = %s WHERE id = %s"
+    parameters = (no_open,no_close,id)
+    
+    try:
+        async with db_pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(update_query, parameters)
+                if cursor.rowcount > 0:
+                    return True
+    except Exception as e:
+        logger.error(f"set_tv_singal 设置tv信号状态错误: {e} id={id}")
+        return False
+    
 async def restore(id: int):
     from DataStore import db_pool
     update_query = "UPDATE exchange_info SET deleted = 0 WHERE id = %s"
