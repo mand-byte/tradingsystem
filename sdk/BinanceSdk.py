@@ -532,3 +532,22 @@ class BinanceSdk(SDKBase):
             return True
         else:
             return response
+    async def get_swap_pnl_history(self,symbol:str,starttime:datetime.datetime):
+        api = {
+            "method": "GET",
+            "url": "/fapi/v1/userTrades",
+            "payload": {
+                'symbol':symbol,
+                'startTime':str(int(starttime.timestamp()*1000))
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if isinstance(result,list):
+            li=[]
+            for i in result:
+                if i['realizedPnl']!='0':
+                    li.append(float(i['realizedPnl']))
+            return li
+        else:
+            return response

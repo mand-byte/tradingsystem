@@ -699,4 +699,29 @@ class OkxSdk(SDKBase):
         if 'code' in result and result['code'] == "0":
             return True
         else:
-            return response 
+            return response
+
+    async def get_pnl_history(self,symbol:str,starttime:datetime.datetime,isswap:bool):
+        api = {
+            "method": "GET",
+            "url": "/api/v5/trade/fills-history",
+            "payload": {
+                'instType':'SWAP' if isswap else 'SPOT',
+                'instId':symbol,
+                #'begin':str(int(starttime.timestamp()*1000))
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'code' in result and result['code'] == "0":
+            li=[]
+            for i in result['data']:
+                if i['fillPnl']!='0':
+                    li.append(float(i['fillPnl']))
+            #颠倒顺序，符合本地数据库记录的顺序        
+            if len(li)>0:
+                li=li[::-1]        
+            return li
+        else:
+            return response      
+

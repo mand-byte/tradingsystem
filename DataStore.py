@@ -159,7 +159,7 @@ def update_trend_setting(data:SetTrendRequest):
     json_conf['Trend']['TREND_RATIO_INVEST'] =data.use_ratio
     json_conf['Trend']['TREND_TP_RATIO'] =data.tp
     if data.use_ratio:
-        json_conf['Trend']['TREND_RATIO_INVEST'] =data.num 
+        json_conf['Trend']['TREND_RATIO_INVEST'] =data.num
     else:    
         json_conf['Trend']['TREND_FIXED_INVEST'] =data.num
 

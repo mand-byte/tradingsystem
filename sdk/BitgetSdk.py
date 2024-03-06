@@ -846,5 +846,28 @@ class BitgetSdk(SDKBase):
         result = json.loads(response)
         if 'code' in result and result['code'] == "00000":
             return True
-        return result            
+        return result
+    async def get_swap_pnl_history(self,symbol:str,starttime:datetime.datetime):
+        api = {
+            "method": "GET",
+            "url": "/api/v2/mix/order/fills",
+            "payload": {
+                'productType':'USDT-FUTURES',
+                'symbol':symbol,
+                'startTime':str(int(starttime.timestamp()*1000))
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'code' in result and result['code'] == "00000":
+            li=[]
+            for i in result['data']['fillList']:
+                if i['tradeSide']=='close':
+                    li.append(float(i['realizedPnl']))
+            #颠倒顺序，符合本地数据库记录的顺序        
+            if len(li)>0:
+                li=li[::-1]        
+            return li
+        else:
+            return response            
 

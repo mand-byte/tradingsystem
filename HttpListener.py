@@ -305,8 +305,6 @@ async def tvnotification(data: TvNotificationRequest, request: Request):
 @app.get('/ts/api/get-setting')
 async def get_setting( token: str = Depends(get_token)):
     user = await verify_token(token)
-    if user.privilege <= 1:
-        return JSONResponse(status_code=Status.UserUnauthorized.value, content={"message": "用户权限不足"})
     conf=DataStore.json_conf.copy()
     del conf['DB']
     del conf['TG']
@@ -318,8 +316,7 @@ async def get_setting( token: str = Depends(get_token)):
 @app.get('/ts/api/get-ex-list')
 async def get_ex_list( token: str = Depends(get_token)):
     user = await verify_token(token)
-    if user.privilege <= 1:
-        return JSONResponse(status_code=Status.UserUnauthorized.value, content={"message": "用户权限不足"})
+    
     import ExchangeDao
     all=await ExchangeDao.exchange_db_query(True)
     li=[]
