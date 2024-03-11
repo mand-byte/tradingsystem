@@ -82,6 +82,9 @@ async def make_tv_order(data):
             elif data.tv_type == Const.ORDER_FROM_TREND:
                 tp = 0
                 sl = 0
+                pattern = r'(\d+\.?\d*)'
+                match = re.findall(pattern, data.comment)
+                
                 if DataStore.json_conf['Trend']['TREND_TP_RATIO'] > 0:
                     if data.action == "buy" and data.market_position == "long":
                         tp = round(
@@ -89,6 +92,10 @@ async def make_tv_order(data):
                     else:
                         tp = round(
                             float(data.price)*(1-DataStore.json_conf['Trend']['TREND_TP_RATIO']), 1)
+                else:
+                    if match:
+                        tp = float(match[0])
+
                 if DataStore.json_conf['Trend']['TREND_SL_RATIO'] > 0:
                     if data.action == "buy" and data.market_position == "long":
                         sl = round(
@@ -96,7 +103,9 @@ async def make_tv_order(data):
                     else:
                         sl = round(
                             float(data.price)*(1+DataStore.json_conf['Trend']['TREND_SL_RATIO']), 1)
-                                
+                else:
+                    if match:
+                        sl = float(match[1])        
                 for id, value in DataStore.controller_list.items():
                     try:
                         if DataStore.json_conf['Trend']['TREND_INVEST_USE_RATIO']:
