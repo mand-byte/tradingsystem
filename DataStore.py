@@ -52,8 +52,9 @@ async def create_pool():
     )
 
 def write_json_conf():
-    file_path = "conf.json"
-    with open(file_path, "w", encoding="utf-8") as json_file:
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    conf_file_path = os.path.join(current_dir, 'conf.json')
+    with open(conf_file_path, "w", encoding="utf-8") as json_file:
         json.dump(json_conf, json_file,ensure_ascii=False, indent=4)
 
 async def add_ex(data:AddExRequest):
@@ -158,6 +159,7 @@ def update_trend_setting(data:SetTrendRequest):
     
     json_conf['Trend']['TREND_RATIO_INVEST'] =data.use_ratio
     json_conf['Trend']['TREND_TP_RATIO'] =data.tp
+    json_conf['Trend']['TREND_SL_RATIO'] =data.sl
     if data.use_ratio:
         json_conf['Trend']['TREND_RATIO_INVEST'] =data.num
     else:    

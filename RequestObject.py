@@ -100,6 +100,7 @@ class SetTrendRequest(BaseModel):
     use_ratio:bool
     num:float
     tp:float
+    sl:float
 
 class SetTGRequest(BaseModel):
     TG_report_err:bool
