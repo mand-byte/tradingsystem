@@ -14,7 +14,7 @@ import TGBot
 import DataStore
 import utils
 import Const
-import datetime
+import time
 # 因为bitget在limit订单时只能设置仓位止盈止损，而不是设置止盈止损计划，如果触发则全仓会被平仓,如果在makeorder里直接设置分批止盈止损，是无法第一时间查到策略id的，也就无法知晓，当前订单情况。
 
 
@@ -293,10 +293,10 @@ class BitgetController(Controller):
     async def make_swap_order(self, symbol: str, money: float, posSide: str, price: float, orderType: int, sl: float, tp: float, sltp_type: int,orderFrom:str):
         if self.sdk.swap_copytrader:
             async with self.lock:
-                time = datetime.datetime.utcnow().timestamp()
-                if (time-self.last_open_time) < 1:
-                    await asyncio.sleep(max(0, time - self.last_open_time))
-                self.last_open_time = time
+                time_=time.time()
+                if (time_-self.last_open_time) < 1:
+                    await asyncio.sleep(max(0, time_ - self.last_open_time))
+                
         info = await self._make_swap_order(symbol, money, posSide, price, orderType)
         info.orderFrom = orderFrom
         info.sl=sl
@@ -343,7 +343,7 @@ class BitgetController(Controller):
             if sl > 0 or tp > 0:
                 info.sltp_status = Const.SLTP_STATUS_READY
                 await DataStore.update_orderinfo(info)
-
+        self.last_open_time = time.time()
         return info
     # 通过订单手动平仓或关闭订单
 
