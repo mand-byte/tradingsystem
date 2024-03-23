@@ -14,6 +14,8 @@ def get_swap_symbol(standard_name: str, ex: str) -> str:
         return f"{standard_name.upper()}USDT"
     elif exchange_name == "bingx":
         return f"{standard_name.upper()}-USDT"
+    elif exchange_name == 'nexo':
+        return f"{standard_name.upper()}USDT"
     else:
         logger.error(f"暂不支持{exchange_name}这个交易所的永续合约名")
 
@@ -30,5 +32,7 @@ def get_spot_symbol(standard_name: str, ex: str) -> str:
         return f"{standard_name.upper()}USDT"
     elif exchange_name == "bingx":
         return f"{standard_name.upper()}-USDT"
+    elif exchange_name == "nexo":
+        return f"{standard_name.upper()}/USDT"
     else:
         logger.error(f"暂不支持{exchange_name}这个交易所的永续合约名")

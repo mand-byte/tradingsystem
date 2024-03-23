@@ -15,6 +15,7 @@ from StrategyOrderDao import StrategyOrder
 import StrategyOrderDao
 from sdk.BinanceSdk import BinanceSdk
 from sdk.BitgetSdk import BitgetSdk
+from sdk.NexoSdk import NexoSdk
 from sdk.OkxSdk import OkxSdk
 from sdk.OrderClass import AccountInfo, SwapPostion
 import aiomysql
@@ -183,6 +184,10 @@ async def init():
     order_info_list = await OrderInfoDB_Query_All()
     for i in ex_list:
         order_info[i.id]=[]
+        swap_account[i.id]=AccountInfo()
+        spot_account[i.id]=AccountInfo()
+        spot_positions[i.id]=[]
+        swap_positions[i.id]=[]
     for info in order_info_list:
         order_info[info.exId].append(info)
     schedule.every().hour.at(":00").do(lambda:asyncio.create_task(every20minTask()))
@@ -191,6 +196,7 @@ async def init():
     schedule.every(2).hours.do(lambda:asyncio.create_task(OkxSdk.request_baseinfo()))
     schedule.every(2).hours.do(lambda: asyncio.create_task(BinanceSdk.request_baseinfo()))
     schedule.every(2).hours.do(lambda: asyncio.create_task(BitgetSdk.request_baseinfo()))
+    
     await asyncio.gather(
         BinanceSdk.request_baseinfo(),
         BitgetSdk.request_baseinfo(),
@@ -208,7 +214,10 @@ async def every20minTask():
         db.datetime=today
         db.money=acc.total
         if id in spot_account:
-            db.money+=spot_account[id].unrealizedPL+spot_account[id].total
+            if controller_list[id].exdata.ex !='nexo':
+                db.money+=spot_account[id].unrealizedPL+spot_account[id].total+spot_account[id].funding
+            else:
+                db.money+=spot_account[id].unrealizedPL    
         db.exId=id
         l.append(db)
         total+=db.money

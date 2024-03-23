@@ -437,6 +437,43 @@ class OkxSdk(SDKBase):
             return (result['data'][0]['algoClOrdId'],)
         else:
             return response
+        
+    async def get_swap_history_by_subpos(self,symbol:str,subPos):
+        _subpos=0
+        if isinstance(subPos,str):
+            _subpos=int(subPos)-1
+        elif isinstance(subPos,list):
+            _subpos=int(sorted(subPos, key=lambda x: int(x))[0])-1
+        api = {
+            "method": "GET",
+            "url": "/api/v5/copytrading/subpositions-history",
+            "payload": {
+                'instId': symbol,
+                'subPosType': 'lead',
+                'before': str(_subpos)
+
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'code' in result and result['code'] == "0":
+            if isinstance(subPos,str):
+                for i in result['data']:
+                    if i['subPosId']==subPos:
+                        return float(i['pnl'])
+            else:
+                pnl=0.0
+                for i in subPos:
+                    for x in result['data']:
+                        if i==x['subPosId']:
+                            pnl+= float(x['pnl'])
+                            break
+                return pnl        
+        else:
+            return response
+        
+
+        
 
     async def make_spot_order(self, symbol: str, size: float, orderType: int = 0, price: float = 0):
         api = {
@@ -569,6 +606,45 @@ class OkxSdk(SDKBase):
             return response
         
 
+    # async def make_algo(self,symbol,tdMode,side,sz,posSide,sl=None,tp=None):
+    #     api = {
+    #         "method": "POST",
+    #         "url": "/api/v5/trade/order-algo",
+    #         "payload": {
+    #             'instId': symbol,
+    #             'tdMode':tdMode,
+    #             'side':side,
+    #             'sz':str(sz),
+    #             'posSide':posSide,
+    #             'tgtCcy':'base_ccy',
+    #             'attachAlgoOrds':[]
+    #         }
+    #     }
+    #     attachAlgoOrd = {}
+    #     api['payload']['attachAlgoOrds'].append(attachAlgoOrd)
+    #     if sl is not None and tp is not None:
+    #         api['payload']['ordType']='oco'
+
+    #     else:
+    #         api['payload']['ordType']='conditional'
+    #     attachAlgoOrd['attachAlgoClOrdId'] = ''
+    #     if sl > 0:
+    #         attachAlgoOrd['slTriggerPx'] = sl
+    #         attachAlgoOrd['slOrdPx'] = '-1'
+    #     if tp > 0:
+    #         attachAlgoOrd['tpTriggerPx'] = tp
+    #         attachAlgoOrd['tpOrdPx'] = '-1'
+    #     response = await self.send_request(api)
+    #     result = json.loads(response)
+    #     if 'code' in result and result['code'] == "0":
+    #         return (result['data'][0]['algoId'],)
+
+    #     else:
+    #         return response
+    # async def cancel_algo():
+    #     pass
+    # 通过策略id获取止盈止损是否生效
+
     async def query_algo(self, algoClOrdId: str):
         api = {
             "method": "GET",
@@ -626,9 +702,42 @@ class OkxSdk(SDKBase):
         response = await self.send_request(api)
         result = json.loads(response)
         if 'code' in result and result['code'] == "0":
-            return True
+            return (result['data'][0]['transId'],)
         else:
             return response
+        
+    async def get_saving_funding(self):
+        api = {
+            "method": "GET",
+            "url": "/api/v5/finance/savings/balance",
+            "payload": {
+                'ccy': "USDT"
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'code' in result and result['code'] == "0":
+            if len(result['data'])>0:
+                return float(result['data'][0]['amt'])
+            return 0
+        else:
+            return response
+    async def get_asset_balance(self):
+        api = {
+            "method": "GET",
+            "url": "/api/v5/asset/balances",
+            "payload": {
+                'ccy': "USDT"
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'code' in result and result['code'] == "0":
+            if len(result['data'])>0:
+                return float(result['data'][0]['bal'])
+            return 0
+        else:
+            return response    
     async def close_swap_by_pos(self,symbol:str,posSide:str,mgnMode:str):
         api = {
             "method": "POST",

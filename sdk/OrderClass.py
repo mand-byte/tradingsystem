@@ -49,6 +49,7 @@ class AccountInfo:
         self.available = 0
         self.unrealizedPL = 0
         self.symbol = None
+        self.funding=0
     # def to_json(self):
     #     return {
     #         'symbol':self.symbol,

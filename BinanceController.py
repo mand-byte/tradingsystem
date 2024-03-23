@@ -8,10 +8,11 @@ from Controller import Controller
 from ExchangeDao import ExchangeDb
 from OrderInfoDao import OrderInfoDB
 from sdk.BinanceSdk import BinanceSdk
-import utils 
+import utils
 import DataStore
 from sdk.OrderClass import AccountInfo, OrderInfo
 import Const
+
 
 class BinanceController(Controller):
     def __init__(self, exdata: ExchangeDb) -> None:
@@ -19,12 +20,14 @@ class BinanceController(Controller):
         self.sdk = BinanceSdk(
             exdata.apikey, exdata.api_secret, exdata.api_password)
         self.exdata = exdata
-        self.job=None
+        self.job = None
+
     async def init(self):
         await self.sdk.init()
         await self.every_min_task()
-        self.job=schedule.every(DataStore.json_conf['DATA_REFRESH_TIME']).seconds.do(lambda: asyncio.create_task(self.every_min_task()))
-        
+        self.job = schedule.every(DataStore.json_conf['DATA_REFRESH_TIME']).seconds.do(
+            lambda: asyncio.create_task(self.every_min_task()))
+
     def cancel_job(self):
         schedule.cancel_job(self.job)
 
@@ -60,8 +63,11 @@ class BinanceController(Controller):
                 element for element in spot_list if element.symbol == "USDT"]
             remaining_elements = [
                 element for element in spot_list if element.symbol != "USDT"]
+            spot_acc = DataStore.spot_account[self.exdata.id]
             if filtered_elements:
-                DataStore.spot_account[self.exdata.id] = filtered_elements[0]
+                spot_acc.available = filtered_elements[0].available
+                spot_acc.total = filtered_elements[0].total
+                spot_acc.unrealizedPL = filtered_elements[0].unrealizedPL
                 DataStore.spot_positions[self.exdata.id] = remaining_elements
                 if len(remaining_elements) > 0:
                     btc = await self.sdk.request_spot_price("BTCUSDT")
@@ -72,7 +78,10 @@ class BinanceController(Controller):
                             spot_total_price += i.unrealizedPL
                     filtered_elements[0].unrealizedPL = spot_total_price
             else:
-                DataStore.spot_account[self.exdata.id] = AccountInfo()
+                spot_acc.total = 0
+                spot_acc.available = 0
+                spot_acc.unrealizedPL = 0
+
                 DataStore.spot_positions[self.exdata.id] = spot_list
                 if len(spot_list) > 0:
                     btc = await self.sdk.request_spot_price("BTCUSDT")
@@ -81,10 +90,10 @@ class BinanceController(Controller):
                         for i in spot_list:
                             i.unrealizedPL = i.unrealizedPL*btc
                             spot_total_price += i.unrealizedPL
-                        DataStore.spot_account[self.exdata.id].unrealizedPL = spot_total_price
+                        spot_acc.unrealizedPL = spot_total_price
 
         else:
-            DataStore.spot_positions[self.exdata.id] = []
+            DataStore.spot_positions[self.exdata.id].clear()
         swap_list = await self.sdk.request_swap_positions()
         if isinstance(swap_list, list):
             DataStore.swap_positions[self.exdata.id] = swap_list
@@ -92,90 +101,96 @@ class BinanceController(Controller):
             DataStore.swap_positions[self.exdata.id] = []
         swap_account = await self.sdk.request_swap_account()
         if not isinstance(swap_account, str):
-            DataStore.swap_account[self.exdata.id] = swap_account
-        else:
-            DataStore.swap_account[self.exdata.id] = AccountInfo()
-       
+            swap_acc = DataStore.swap_account[self.exdata.id]
+            swap_acc.available = swap_account.available
+            swap_acc.symbol = swap_account.symbol
+            swap_acc.total = swap_account.total
+            swap_acc.unrealizedPL = swap_account.unrealizedPL
+        saving = await self.sdk.get_saving_funding()
+        if isinstance(saving, float):
+            DataStore.spot_account[self.exdata.id].funding = saving
         del_list: set = set()
         update_list: set = set()
         for ord in DataStore.order_info[self.exdata.id]:
             if ord.isswap:
-                server_info=await self.sdk.query_swap_order_info(ord.symbol,ord.orderId)
-                if not isinstance(server_info,str):
-                    self.update_orderdb(update_list,del_list,ord,server_info)
-                if ord.status==Const.ORDER_STATUS_FILLED:
-                    if ord.sltp_status==Const.SLTP_STATUS_READY:
-                        if ord.sl>0:
-                            result=await self.sdk.set_swap_sl(ord.symbol,ord.size,ord.posSide,ord.sl,False)
-                            if not isinstance(result,str):
-                                ord.sltp_status=Const.SLTP_STATUS_FINISH
-                                ord.sl_id=result[0]
+                server_info = await self.sdk.query_swap_order_info(ord.symbol, ord.orderId)
+                if not isinstance(server_info, str):
+                    self.update_orderdb(
+                        update_list, del_list, ord, server_info)
+                if ord.status == Const.ORDER_STATUS_FILLED:
+                    if ord.sltp_status == Const.SLTP_STATUS_READY:
+                        if ord.sl > 0:
+                            result = await self.sdk.set_swap_sl(ord.symbol, ord.size, ord.posSide, ord.sl, False)
+                            if not isinstance(result, str):
+                                ord.sltp_status = Const.SLTP_STATUS_FINISH
+                                ord.sl_id = result[0]
                                 update_list.add(ord)
-                        if ord.tp>0:
-                            result=await self.sdk.set_swap_tp(ord.symbol,ord.size,ord.posSide,ord.tp,False)
-                            if not isinstance(result,str):
-                                ord.sltp_status=Const.SLTP_STATUS_FINISH
-                                ord.tp_id=result[0]
+                        if ord.tp > 0:
+                            result = await self.sdk.set_swap_tp(ord.symbol, ord.size, ord.posSide, ord.tp, False)
+                            if not isinstance(result, str):
+                                ord.sltp_status = Const.SLTP_STATUS_FINISH
+                                ord.tp_id = result[0]
                                 update_list.add(ord)
-                    elif ord.sltp_status==Const.SLTP_STATUS_FINISH:
-                        if len(ord.sl_id)>0:
-                            result=await self.sdk.query_swap_order_info(ord.symbol,ord.sl_id)
-                            if not isinstance(result,str):
-                                if result.status!=Const.ORDER_STATUS_LIVE:
+                    elif ord.sltp_status == Const.SLTP_STATUS_FINISH:
+                        if len(ord.sl_id) > 0:
+                            result = await self.sdk.query_swap_order_info(ord.symbol, ord.sl_id)
+                            if not isinstance(result, str):
+                                if result.status != Const.ORDER_STATUS_LIVE:
                                     del_list.add(ord)
-                        if len(ord.tp_id)>0:
-                            result=await self.sdk.query_swap_order_info(ord.symbol,ord.tp_id)
-                            if not isinstance(result,str):
-                                if result.status!=Const.ORDER_STATUS_LIVE:
+                        if len(ord.tp_id) > 0:
+                            result = await self.sdk.query_swap_order_info(ord.symbol, ord.tp_id)
+                            if not isinstance(result, str):
+                                if result.status != Const.ORDER_STATUS_LIVE:
                                     del_list.add(ord)
+                                if result.status == Const.ORDER_STATUS_FILLED and DataStore.json_conf['TransferProfit'] > 0:
+                                    asyncio.create_task(
+                                        self.get_swap_pnl(ord.symbol, ord.tp_id))
             else:
-                server_info=await self.sdk.query_spot_order_info(ord.symbol,ord.orderId)
-                if not isinstance(server_info,str):
-                    self.update_orderdb(update_list,del_list,ord,server_info)
-                if ord.status==Const.ORDER_STATUS_FILLED:
-                    if ord.sltp_status==Const.SLTP_STATUS_READY:
-                        if ord.sl>0:
-                            result=await self.sdk.set_spot_sl(ord.symbol,ord.size,ord.sl,False)
-                            if not isinstance(result,str):
-                                ord.sl_id=result[0]
-                                ord.sltp_status=Const.SLTP_STATUS_FINISH
+                server_info = await self.sdk.query_spot_order_info(ord.symbol, ord.orderId)
+                if not isinstance(server_info, str):
+                    self.update_orderdb(
+                        update_list, del_list, ord, server_info)
+                if ord.status == Const.ORDER_STATUS_FILLED:
+                    if ord.sltp_status == Const.SLTP_STATUS_READY:
+                        if ord.sl > 0:
+                            result = await self.sdk.set_spot_sl(ord.symbol, ord.size, ord.sl, False)
+                            if not isinstance(result, str):
+                                ord.sl_id = result[0]
+                                ord.sltp_status = Const.SLTP_STATUS_FINISH
                                 update_list.add(ord)
-                        if ord.tp>0 :
-                            result=await self.sdk.set_spot_tp(ord.symbol,ord.size,ord.tp,False)
-                            if not isinstance(result,str):
-                                ord.sltp_status=Const.SLTP_STATUS_FINISH
-                                ord.tp_id=result[0]
+                        if ord.tp > 0:
+                            result = await self.sdk.set_spot_tp(ord.symbol, ord.size, ord.tp, False)
+                            if not isinstance(result, str):
+                                ord.sltp_status = Const.SLTP_STATUS_FINISH
+                                ord.tp_id = result[0]
                                 update_list.add(ord)
-                    elif ord.sltp_status==Const.SLTP_STATUS_FINISH:
-                        if ord.sl>0 and len(ord.sl_id)>0:
-                            result=await self.sdk.query_spot_order_info(ord.symbol,ord.sl_id)
-                            if not isinstance(result,str):
-                                if result.status!=Const.ORDER_STATUS_LIVE:
+                    elif ord.sltp_status == Const.SLTP_STATUS_FINISH:
+                        if ord.sl > 0 and len(ord.sl_id) > 0:
+                            result = await self.sdk.query_spot_order_info(ord.symbol, ord.sl_id)
+                            if not isinstance(result, str):
+                                if result.status != Const.ORDER_STATUS_LIVE:
                                     del_list.add(ord)
-                        if ord.tp>0 and len(ord.tp_id)>0:
-                            result=await self.sdk.query_spot_order_info(ord.symbol,ord.tp_id)
-                            if not isinstance(result,str):
-                                if result.status!=Const.ORDER_STATUS_LIVE:
+                        if ord.tp > 0 and len(ord.tp_id) > 0:
+                            result = await self.sdk.query_spot_order_info(ord.symbol, ord.tp_id)
+                            if not isinstance(result, str):
+                                if result.status != Const.ORDER_STATUS_LIVE:
                                     del_list.add(ord)
         if len(update_list) > 0:
             await DataStore.update_orderinfo(update_list)
         if len(del_list) > 0:
             await DataStore.del_orderinfo(del_list)
 
-    
 
-    
+################################################### swap#############################################################################################################
 
-
-###################################################swap#############################################################################################################
     async def _make_swap_order(self, symbol: str, money: float, posSide: str, price: float, orderType: int) -> OrderInfoDB:
         symbol = utils.get_swap_symbol(symbol, self.exdata.ex)
         if symbol not in BinanceSdk.swap_baseinfo:
             msg = f"binance sdk 没有{symbol}这个交易对"
             logger.error(msg)
-            
+
             raise HTTPException(
-                    status_code=Status.ExchangeError.value, detail=msg)
+                status_code=Status.ExchangeError.value, detail=msg)
         size = 0
         if orderType == Const.ORDER_TYPE_MARKET:
             mark_price = await self.sdk.request_swap_price(symbol)
@@ -204,61 +219,59 @@ class BinanceController(Controller):
             info.posSide = posSide
             info.size = size
             info.isswap = True
-            info.symbol=symbol
-            info.orderType=orderType
-            info.marginMode='cross'
+            info.symbol = symbol
+            info.orderType = orderType
+            info.marginMode = 'cross'
             return info
-    
 
+    async def make_swap_order(self, symbol: str, money: float, posSide: str, price: float, orderType: int, sl: float, tp: float, sltp_type: int, orderFrom: str):
 
-    async def make_swap_order(self, symbol: str, money: float, posSide: str, price: float, orderType: int,sl:float,tp:float,sltp_type:int,orderFrom:str):
-     
         info = await self._make_swap_order(symbol, money, posSide, price, orderType)
         info.orderFrom = orderFrom
-        info.sl=sl
-        info.tp=tp 
+        info.sl = sl
+        info.tp = tp
         await DataStore.insert_orderinfo(info)
-        msg=f'binance make_swap_order 下单成功 {info.to_json()}'
+        msg = f'binance make_swap_order 下单成功 {info.to_json()}'
         logger.info(msg)
-        await TGBot.send_open_msg(msg)    
-        if orderType==Const.ORDER_TYPE_LIMIT:
-            if sl>0 or tp>0:
-                info.sltp_status=Const.SLTP_STATUS_READY
+        await TGBot.send_open_msg(msg)
+        if orderType == Const.ORDER_TYPE_LIMIT:
+            if sl > 0 or tp > 0:
+                info.sltp_status = Const.SLTP_STATUS_READY
                 await DataStore.update_orderinfo(info)
-        else:    
-            if sl>0:
-                info.sltp_status=Const.SLTP_STATUS_READY
+        else:
+            if sl > 0:
+                info.sltp_status = Const.SLTP_STATUS_READY
                 await DataStore.update_orderinfo(info)
-                result=await self.sdk.set_swap_sl(info.symbol,info.size,info.posSide,sl,False)
-                if isinstance(result,str):
+                result = await self.sdk.set_swap_sl(info.symbol, info.size, info.posSide, sl, False)
+                if isinstance(result, str):
                     msg = f"binance controller set_swap_sl 错误 info={info.to_json()} err={result} "
                     logger.error(msg)
                     await TGBot.send_err_msg(msg)
                     raise HTTPException(
                         status_code=Status.ExchangeError.value, detail=msg)
                 else:
-                    info.sl_id=result[0]
-                    info.sltp_status=Const.SLTP_STATUS_FINISH
+                    info.sl_id = result[0]
+                    info.sltp_status = Const.SLTP_STATUS_FINISH
                     await DataStore.update_orderinfo(info)
-            if tp>0:
-                info.sltp_status=Const.SLTP_STATUS_READY
+            if tp > 0:
+                info.sltp_status = Const.SLTP_STATUS_READY
                 await DataStore.update_orderinfo(info)
-                result=await self.sdk.set_swap_tp(info.symbol,info.size,info.posSide,tp,False)
-                if isinstance(result,str):
+                result = await self.sdk.set_swap_tp(info.symbol, info.size, info.posSide, tp, False)
+                if isinstance(result, str):
                     msg = f"binance controller set_swap_tp 错误 info={info.to_json()} err={result} "
                     logger.error(msg)
                     await TGBot.send_err_msg(msg)
                     raise HTTPException(
                         status_code=Status.ExchangeError.value, detail=msg)
                 else:
-                    info.tp_id=result[0]
-                    info.sltp_status=Const.SLTP_STATUS_FINISH   
+                    info.tp_id = result[0]
+                    info.sltp_status = Const.SLTP_STATUS_FINISH
                     await DataStore.update_orderinfo(info)
-               
+
         return info
 
-    #通过订单手动平仓或关闭订单
-    async def close_swap_by_order(self, id)->bool:
+    # 通过订单手动平仓或关闭订单
+    async def close_swap_by_order(self, id) -> bool:
         info: OrderInfoDB = None
         for i in DataStore.order_info[self.exdata.id]:
             if i.id == id:
@@ -286,15 +299,18 @@ class BinanceController(Controller):
                 raise HTTPException(
                     status_code=Status.ExchangeError.value, detail=msg)
             else:
-                msg=f'binance close_swap_by_order  平仓成功 {info.to_json()} '
+                msg = f'binance close_swap_by_order  平仓成功 {info.to_json()} '
                 logger.info(msg)
                 await TGBot.send_close_msg(msg)
                 if len(info.sl_id) > 0:
                     await self.sdk.cancel_swap_order(info.symbol, info.sl_id)
                 if len(info.tp_id) > 0:
                     await self.sdk.cancel_swap_order(info.symbol, info.tp_id)
+                if DataStore.json_conf['TransferProfit'] > 0:
+                    asyncio.create_task(
+                        self.get_swap_pnl(info.symbol, result[0]))
         elif orderInfo.status == Const.ORDER_STATUS_LIVE:
-            
+
             result = await self.sdk.cancel_swap_order(info.symbol, info.orderId)
             if isinstance(result, str):
                 msg = f"binance close_swap_by_order 关闭订单失败 info={info.to_json()} result={result}"
@@ -303,14 +319,14 @@ class BinanceController(Controller):
                 raise HTTPException(
                     status_code=Status.ExchangeError.value, detail=msg)
             else:
-                msg=f'binance close_swap_by_order 订单取消成功 {info.to_json()}'
+                msg = f'binance close_swap_by_order 订单取消成功 {info.to_json()}'
                 logger.info(msg)
                 await TGBot.send_close_msg(msg)
                 if len(info.sl_id) > 0:
                     await self.sdk.cancel_swap_order(info.symbol, info.sl_id)
                 if len(info.tp_id) > 0:
                     await self.sdk.cancel_swap_order(info.symbol, info.tp_id)
-            
+
         else:
             msg = f"binance query_swap_order_info 当前订单状态为 status={orderInfo.status} 无法手动关闭"
             logger.error(msg)
@@ -319,19 +335,20 @@ class BinanceController(Controller):
                 status_code=Status.ExchangeError.value, detail=msg)
         await DataStore.del_orderinfo(info)
         return True
-    #通过仓位手动全部平仓
-    async def close_swap_by_pos(self, symbol, posSide)->bool:
+    # 通过仓位手动全部平仓
+
+    async def close_swap_by_pos(self, symbol, posSide) -> bool:
         symbol = utils.get_swap_symbol(symbol, self.exdata.ex)
         del_info_list = []
         for i in DataStore.order_info[self.exdata.id]:
-            if i.symbol == symbol and i.posSide == posSide and i.isswap and i.status==Const.ORDER_STATUS_FILLED:
-                result=await self.sdk.close_swap_order_by_market(i.symbol,i.size,i.posSide)
-                if isinstance(result,str):
+            if i.symbol == symbol and i.posSide == posSide and i.isswap and i.status == Const.ORDER_STATUS_FILLED:
+                result = await self.sdk.close_swap_order_by_market(i.symbol, i.size, i.posSide)
+                if isinstance(result, str):
                     msg = f"binance close_swap_by_pos 平仓失败 info={i.to_json()}  result={result}"
                     logger.error(msg)
                     await TGBot.send_err_msg(msg)
                 else:
-                    msg=f'binance close_swap_by_pos 平仓成功 {i.to_json()}'
+                    msg = f'binance close_swap_by_pos 平仓成功 {i.to_json()}'
                     logger.info(msg)
                     await TGBot.send_close_msg(msg)
                     if len(i.tp_id) > 0:
@@ -339,65 +356,70 @@ class BinanceController(Controller):
                     if len(i.sl_id) > 0:
                         await self.sdk.cancel_swap_order(i.symbol, i.sl_id)
                     del_info_list.append(i)
+                    if DataStore.json_conf['TransferProfit'] > 0:
+                        asyncio.create_task(
+                            self.get_swap_pnl(i.symbol, result[0]))
         await DataStore.del_orderinfo(del_info_list)
 
         return True
-    #设置仓位的止盈止损
-    async def set_swap_sltp_by_pos(self,symbol,posSide,sl,tp)->bool:#SLTPMarketDB:
-        symbol=utils.get_swap_symbol(symbol,self.exdata.ex)
+    # 设置仓位的止盈止损
+
+    # SLTPMarketDB:
+    async def set_swap_sltp_by_pos(self, symbol, posSide, sl, tp) -> bool:
+        symbol = utils.get_swap_symbol(symbol, self.exdata.ex)
         for i in DataStore.order_info[self.exdata.id]:
-            if i.symbol==symbol and i.isswap and i.posSide==posSide and i.status==Const.ORDER_STATUS_FILLED:
-                
-                if len(i.sl_id)>0:
-                    await self.sdk.cancel_swap_order(i.symbol,i.sl_id)
-                    i.sl=0
-                    i.sl_id=''
-                    i.sltp_status=Const.SLTP_STATUS_NONE
+            if i.symbol == symbol and i.isswap and i.posSide == posSide and i.status == Const.ORDER_STATUS_FILLED:
+
+                if len(i.sl_id) > 0:
+                    await self.sdk.cancel_swap_order(i.symbol, i.sl_id)
+                    i.sl = 0
+                    i.sl_id = ''
+                    i.sltp_status = Const.SLTP_STATUS_NONE
                     await DataStore.update_orderinfo(i)
-                if len(i.tp_id)>0:
-                    await self.sdk.cancel_swap_order(i.symbol,i.tp_id)
-                    i.tp=0
-                    i.tp_id=''
-                    i.sltp_status=Const.SLTP_STATUS_NONE
+                if len(i.tp_id) > 0:
+                    await self.sdk.cancel_swap_order(i.symbol, i.tp_id)
+                    i.tp = 0
+                    i.tp_id = ''
+                    i.sltp_status = Const.SLTP_STATUS_NONE
                     await DataStore.update_orderinfo(i)
-                if sl>0:
-                    result=await self.sdk.set_swap_sl(i.symbol,i.size,i.posSide,sl,False)
-                    if isinstance(result,str):
+                if sl > 0:
+                    result = await self.sdk.set_swap_sl(i.symbol, i.size, i.posSide, sl, False)
+                    if isinstance(result, str):
                         msg = f"binance set_swap_sl 失败 symbol={symbol} posSide={posSide} size={i.size}  result={result}"
                         logger.error(msg)
-                        i.sl=sl
-                        i.sltp_status=Const.SLTP_STATUS_READY
+                        i.sl = sl
+                        i.sltp_status = Const.SLTP_STATUS_READY
                         await DataStore.update_orderinfo(i)
                         await TGBot.send_err_msg(msg)
                     else:
-                        i.sl=sl
-                        i.sl_id=result[0]
-                        i.sltp_status=Const.SLTP_STATUS_FINISH
+                        i.sl = sl
+                        i.sl_id = result[0]
+                        i.sltp_status = Const.SLTP_STATUS_FINISH
                         await DataStore.update_orderinfo(i)
-                if tp>0:
-                    result=await self.sdk.set_swap_tp(i.symbol,i.size,i.posSide,tp,False)
-                    if isinstance(result,str):
+                if tp > 0:
+                    result = await self.sdk.set_swap_tp(i.symbol, i.size, i.posSide, tp, False)
+                    if isinstance(result, str):
                         msg = f"binance set_swap_tp 失败 symbol={symbol} posSide={posSide} size={i.size}  result={result}"
                         logger.error(msg)
-                        i.tp=tp
-                        i.sltp_status=Const.SLTP_STATUS_READY
+                        i.tp = tp
+                        i.sltp_status = Const.SLTP_STATUS_READY
                         await DataStore.update_orderinfo(i)
                         await TGBot.send_err_msg(msg)
                     else:
-                        i.tp=tp
-                        i.tp_id=result[0]
-                        i.sltp_status=Const.SLTP_STATUS_FINISH
+                        i.tp = tp
+                        i.tp_id = result[0]
+                        i.sltp_status = Const.SLTP_STATUS_FINISH
                         await DataStore.update_orderinfo(i)
-                                            
-    
-        return True         
-    #设置订单的止盈止损
-    async def set_swap_sltp_by_order(self,id,sl,tp)->OrderInfoDB:
-        #判断订单状态，状态为1时，如果是交易员，通过交易员接口修改止盈止损，如果是普通用户，则先删除再重建止盈止损
-        info :OrderInfoDB= None
+
+        return True
+    # 设置订单的止盈止损
+
+    async def set_swap_sltp_by_order(self, id, sl, tp) -> OrderInfoDB:
+        # 判断订单状态，状态为1时，如果是交易员，通过交易员接口修改止盈止损，如果是普通用户，则先删除再重建止盈止损
+        info: OrderInfoDB = None
         for i in DataStore.order_info[self.exdata.id]:
-            if i.id==id:
-                info=i
+            if i.id == id:
+                info = i
                 break
         if info is None:
             msg = f"binance set_swap_sltp_by_order 未找到ID={id}的订单"
@@ -405,74 +427,92 @@ class BinanceController(Controller):
             await TGBot.send_err_msg(msg)
             raise HTTPException(
                 status_code=Status.ExchangeError.value, detail=msg)
-        order_info=await self.sdk.query_swap_order_info(info.symbol,info.orderId)
-        if isinstance(order_info,str):
+        order_info = await self.sdk.query_swap_order_info(info.symbol, info.orderId)
+        if isinstance(order_info, str):
             msg = f"binance query_swap_order_info 未找到ID={info.orderId}的订单 result={order_info}"
             logger.error(msg)
             await TGBot.send_err_msg(msg)
             raise HTTPException(
                 status_code=Status.ExchangeError.value, detail=msg)
-        if  order_info.status==Const.ORDER_STATUS_FILLED:
-            if len(info.sl_id)>0:
-                await self.sdk.cancel_swap_order(info.symbol,info.sl_id)
-                info.sl=0
-                info.sl_id=''
-                info.sltp_status=Const.SLTP_STATUS_NONE
+        if order_info.status == Const.ORDER_STATUS_FILLED:
+            if len(info.sl_id) > 0:
+                await self.sdk.cancel_swap_order(info.symbol, info.sl_id)
+                info.sl = 0
+                info.sl_id = ''
+                info.sltp_status = Const.SLTP_STATUS_NONE
                 await DataStore.update_orderinfo(i)
-            if len(info.tp_id)>0:
-                await self.sdk.cancel_swap_order(info.symbol,info.tp_id)
-                info.tp=0
-                info.tp_id=''
-                info.sltp_status=Const.SLTP_STATUS_NONE
+            if len(info.tp_id) > 0:
+                await self.sdk.cancel_swap_order(info.symbol, info.tp_id)
+                info.tp = 0
+                info.tp_id = ''
+                info.sltp_status = Const.SLTP_STATUS_NONE
                 await DataStore.update_orderinfo(i)
-            if sl>0:
-                result=await self.sdk.set_swap_sl(info.symbol,info.size,info.posSide,sl,False)
-                if isinstance(result,str):
+            if sl > 0:
+                result = await self.sdk.set_swap_sl(info.symbol, info.size, info.posSide, sl, False)
+                if isinstance(result, str):
                     msg = f"binance set_swap_sl 错误 info={info.to_json()} sl={sl}  result={result}"
                     logger.error(msg)
-                    i.sl=sl
-                    i.sltp_status=Const.SLTP_STATUS_READY
+                    i.sl = sl
+                    i.sltp_status = Const.SLTP_STATUS_READY
                     await DataStore.update_orderinfo(i)
                     await TGBot.send_err_msg(msg)
                     raise HTTPException(
                         status_code=Status.ExchangeError.value, detail=msg)
                 else:
-                    info.sl=sl
-                    info.sl_id=result[0]
-                    info.sltp_status=Const.SLTP_STATUS_FINISH
+                    info.sl = sl
+                    info.sl_id = result[0]
+                    info.sltp_status = Const.SLTP_STATUS_FINISH
                     await DataStore.update_orderinfo(info)
-            if tp>0:
-                result=await self.sdk.set_swap_tp(info.symbol,info.size,info.posSide,tp,False)
-                if isinstance(result,str):
+            if tp > 0:
+                result = await self.sdk.set_swap_tp(info.symbol, info.size, info.posSide, tp, False)
+                if isinstance(result, str):
                     msg = f"binance set_swap_tp 错误 info={info.to_json()} tp={tp}  result={result}"
                     logger.error(msg)
-                    i.tp=tp
-                    i.sltp_status=Const.SLTP_STATUS_READY
+                    i.tp = tp
+                    i.sltp_status = Const.SLTP_STATUS_READY
                     await DataStore.update_orderinfo(i)
                     await TGBot.send_err_msg(msg)
                     raise HTTPException(
                         status_code=Status.ExchangeError.value, detail=msg)
                 else:
-                    info.tp=tp
-                    info.tp_id=result[0]
-                    info.sltp_status=Const.SLTP_STATUS_FINISH
+                    info.tp = tp
+                    info.tp_id = result[0]
+                    info.sltp_status = Const.SLTP_STATUS_FINISH
                     await DataStore.update_orderinfo(info)
-        elif order_info.status==Const.ORDER_STATUS_LIVE or order_info.status==Const.ORDER_STATUS_PARTIALLY_FILLED:
-            info.sl=sl
-            info.tp=tp
-            if sl>0 or tp>0:
-                info.sltp_status=Const.SLTP_STATUS_READY
+        elif order_info.status == Const.ORDER_STATUS_LIVE or order_info.status == Const.ORDER_STATUS_PARTIALLY_FILLED:
+            info.sl = sl
+            info.tp = tp
+            if sl > 0 or tp > 0:
+                info.sltp_status = Const.SLTP_STATUS_READY
             else:
-                info.sltp_status=Const.SLTP_STATUS_NONE 
-            await DataStore.update_orderinfo(info)        
+                info.sltp_status = Const.SLTP_STATUS_NONE
+            await DataStore.update_orderinfo(info)
         else:
             msg = f"binance set_swap_sltp_by_order 错误 info={info.to_json()} 当前订单状态为{order_info.status} 不能设置止盈止损"
             logger.error(msg)
             await TGBot.send_err_msg(msg)
             raise HTTPException(
                 status_code=Status.ExchangeError.value, detail=msg)
-        return info 
+        return info
 
+    async def get_swap_pnl(self, symbol: str, orderId: str):
+        await asyncio.sleep(2)
+        profit = await self.sdk.get_swap_pnl_history(symbol, orderId)
+        if isinstance(profit, float):
+            if profit > 0:
+                _profit = profit*DataStore.json_conf['TransferProfit']
+                result = await self.sdk.transfer(1, 0, _profit)
+                if isinstance(result, tuple):
+                    msg = f"binance symbol={symbol} 盈利 {profit} 划转 {_profit} 到现金账户 tranId={result[0]}"
+                    logger.info(msg)
+                else:
+                    msg = f"binance symbol={symbol} 盈利 {profit} 划转 {_profit} 到现金账户失败  err={result}"
+                    logger.error(msg)
+                    await TGBot.send_err_msg(msg)
+        else:
+            msg = f"binance get_swap_pnl_history 错误 symbol={symbol} orderId={orderId} err={result}"
+            logger.error(msg)
+            await TGBot.send_err_msg(msg)
 
 ################################################### SPOT#############################################################################################################
     async def _make_spot_order(self, symbol: str, money: float, price: float, orderType: int):
@@ -510,60 +550,62 @@ class BinanceController(Controller):
         db.isswap = False
         db.size = size
         db.symbol = symbol
-        db.orderType=orderType
+        db.orderType = orderType
         return db
-    #币安现货没有全仓止盈止损。只能在每个订单上设置止盈止损
-    async def make_spot_order(self, symbol: str, money: float, price: float, orderType: int, sl: float, tp: float, sltp_type: int,orderFrom:str) -> OrderInfoDB:
+    # 币安现货没有全仓止盈止损。只能在每个订单上设置止盈止损
+
+    async def make_spot_order(self, symbol: str, money: float, price: float, orderType: int, sl: float, tp: float, sltp_type: int, orderFrom: str) -> OrderInfoDB:
         info = await self._make_spot_order(symbol, money, price, orderType)
-        info.orderFrom=orderFrom
+        info.orderFrom = orderFrom
         await DataStore.insert_orderinfo(info)
-        msg=f'binance spot 开仓下单成功 {info.to_json()}'
+        msg = f'binance spot 开仓下单成功 {info.to_json()}'
         logger.info(msg)
         await TGBot.send_open_msg(msg)
         if sl <= 0 and tp <= 0:
             return info
-        info.sl=sl
-        info.tp=tp
-        if orderType==Const.ORDER_TYPE_LIMIT:
-            info.sltp_status=Const.SLTP_STATUS_READY
+        info.sl = sl
+        info.tp = tp
+        if orderType == Const.ORDER_TYPE_LIMIT:
+            info.sltp_status = Const.SLTP_STATUS_READY
             await DataStore.update_orderinfo(info)
         else:
-            if sl>0:
-                result=await self.sdk.set_spot_sl(info.symbol,info.size,sl)
-                if isinstance(result,str):
+            if sl > 0:
+                result = await self.sdk.set_spot_sl(info.symbol, info.size, sl)
+                if isinstance(result, str):
                     msg = f"binance controller set_spot_sl 设置订单止损失败 info={info.to_json()} err={result} "
                     logger.error(msg)
                     await TGBot.send_err_msg(msg)
                     raise HTTPException(
                         status_code=Status.ExchangeError.value, detail=msg)
                 else:
-                    info.sltp_status=Const.SLTP_STATUS_FINISH
+                    info.sltp_status = Const.SLTP_STATUS_FINISH
                     await DataStore.update_orderinfo(info)
-            if tp>0:
-                result=await self.sdk.set_spot_tp(info.symbol,info.size,tp)
-                if isinstance(result,str):
+            if tp > 0:
+                result = await self.sdk.set_spot_tp(info.symbol, info.size, tp)
+                if isinstance(result, str):
                     msg = f"binance controller set_spot_tp 设置订单止盈失败 info={info.to_json()} err={result} "
                     logger.error(msg)
                     await TGBot.send_err_msg(msg)
                     raise HTTPException(
                         status_code=Status.ExchangeError.value, detail=msg)
                 else:
-                    info.sltp_status=Const.SLTP_STATUS_FINISH
-                    await DataStore.update_orderinfo(info)        
+                    info.sltp_status = Const.SLTP_STATUS_FINISH
+                    await DataStore.update_orderinfo(info)
         return info
-    
-    async def set_spot_sltp_by_pos(self,symbol,sl,tp)->bool:#SLTPMarketDB:
-        symbol=utils.get_spot_symbol(symbol,self.exdata.id)
+
+    # SLTPMarketDB:
+    async def set_spot_sltp_by_pos(self, symbol, sl, tp) -> bool:
+        symbol = utils.get_spot_symbol(symbol, self.exdata.id)
         for i in DataStore.order_info[self.exdata.id]:
-            if i.isswap==False and i.symbol==symbol and i.status==Const.ORDER_STATUS_FILLED:
+            if i.isswap == False and i.symbol == symbol and i.status == Const.ORDER_STATUS_FILLED:
                 try:
-                    await self.set_spot_sltp_by_order(i.id,sl,tp)
+                    await self.set_spot_sltp_by_order(i.id, sl, tp)
                 except:
-                    pass     
-                  
+                    pass
+
         return True
-    
-    async def set_spot_sltp_by_order(self,id,sl,tp)->OrderInfoDB:
+
+    async def set_spot_sltp_by_order(self, id, sl, tp) -> OrderInfoDB:
         info: OrderInfoDB = None
         for i in DataStore.order_info[self.exdata.id]:
             if i.id == id:
@@ -575,70 +617,69 @@ class BinanceController(Controller):
             await TGBot.send_err_msg(msg)
             raise HTTPException(
                 status_code=Status.ExchangeError.value, detail=msg)
-       
-        if info.status==Const.ORDER_STATUS_FILLED: 
-            if len(info.sl_id)>0:
-                result=await self.sdk.cancel_spot_order(info.symbol,info.sl_id)
-                if isinstance(result,str):
+
+        if info.status == Const.ORDER_STATUS_FILLED:
+            if len(info.sl_id) > 0:
+                result = await self.sdk.cancel_spot_order(info.symbol, info.sl_id)
+                if isinstance(result, str):
                     msg = f"binance controller cancel_spot_order 删除订单止损错误 info={info.to_json()} error={result} "
                     logger.error(msg)
                     await TGBot.send_err_msg(msg)
                 else:
-                    info.sl=0
-                    info.sl_id=''
-                    info.sltp_status=Const.SLTP_STATUS_NONE
-                    await DataStore.update_orderinfo(info)    
-            if len(info.tp_id)>0:
-                result=await self.sdk.cancel_spot_order(info.symbol,info.tp_id)
-                if isinstance(result,str):
+                    info.sl = 0
+                    info.sl_id = ''
+                    info.sltp_status = Const.SLTP_STATUS_NONE
+                    await DataStore.update_orderinfo(info)
+            if len(info.tp_id) > 0:
+                result = await self.sdk.cancel_spot_order(info.symbol, info.tp_id)
+                if isinstance(result, str):
                     msg = f"binance controller cancel_spot_order 删除订单止盈错误 info={info.to_json()} error={result} "
                     logger.error(msg)
                     await TGBot.send_err_msg(msg)
                 else:
-                    info.tp=0
-                    info.tp_id=''
-                    info.sltp_status=Const.SLTP_STATUS_NONE
-                    await DataStore.update_orderinfo(info)       
-            if sl>0:
-                result=await self.sdk.set_spot_sl(info.symbol,info.size,sl)
-                if isinstance(result,str):
+                    info.tp = 0
+                    info.tp_id = ''
+                    info.sltp_status = Const.SLTP_STATUS_NONE
+                    await DataStore.update_orderinfo(info)
+            if sl > 0:
+                result = await self.sdk.set_spot_sl(info.symbol, info.size, sl)
+                if isinstance(result, str):
                     msg = f"binance controller set_spot_sl 设置订单止损错误 info={info.to_json()} error={result} "
                     logger.error(msg)
-                    info.sl=sl
-                    info.sltp_status=Const.SLTP_STATUS_READY
+                    info.sl = sl
+                    info.sltp_status = Const.SLTP_STATUS_READY
                     await DataStore.update_orderinfo(info)
                     await TGBot.send_err_msg(msg)
                 else:
-                    info.sl=sl
-                    info.sl_id=result[0]
-                    info.sltp_status=Const.SLTP_STATUS_FINISH
+                    info.sl = sl
+                    info.sl_id = result[0]
+                    info.sltp_status = Const.SLTP_STATUS_FINISH
                     await DataStore.update_orderinfo(info)
-            if tp>0:
-                result=await self.sdk.set_spot_tp(info.symbol,info.size,tp)
-                if isinstance(result,str):
+            if tp > 0:
+                result = await self.sdk.set_spot_tp(info.symbol, info.size, tp)
+                if isinstance(result, str):
                     msg = f"binance controller set_spot_tp 设置订单止盈错误 info={info.to_json()} error={result} "
                     logger.error(msg)
-                    info.tp=tp
-                    info.sltp_status=Const.SLTP_STATUS_READY
+                    info.tp = tp
+                    info.sltp_status = Const.SLTP_STATUS_READY
                     await DataStore.update_orderinfo(info)
                     await TGBot.send_err_msg(msg)
                 else:
-                    info.tp=tp
-                    info.tp_id=result[0]
-                    info.sltp_status=Const.SLTP_STATUS_FINISH
+                    info.tp = tp
+                    info.tp_id = result[0]
+                    info.sltp_status = Const.SLTP_STATUS_FINISH
                     await DataStore.update_orderinfo(info)
         else:
-            info.sl=sl
-            info.tp=tp
-            if sl>0 or tp>0:
-                info.sltp_status=Const.SLTP_STATUS_READY
+            info.sl = sl
+            info.tp = tp
+            if sl > 0 or tp > 0:
+                info.sltp_status = Const.SLTP_STATUS_READY
             else:
-                info.sltp_status=Const.SLTP_STATUS_NONE
-            await DataStore.update_orderinfo(info)                     
+                info.sltp_status = Const.SLTP_STATUS_NONE
+            await DataStore.update_orderinfo(info)
         return info
-    
-    
-    async def close_spot_by_order(self, id)->bool:
+
+    async def close_spot_by_order(self, id) -> bool:
         info: OrderInfoDB = None
         for i in DataStore.order_info[self.exdata.id]:
             if i.id == id:
@@ -657,9 +698,9 @@ class BinanceController(Controller):
             await TGBot.send_err_msg(msg)
             raise HTTPException(
                 status_code=Status.ExchangeError.value, detail=msg)
-        if orderInfo.status==Const.ORDER_STATUS_LIVE:
-            result=await self.sdk.cancel_spot_order(info.symbol,info.orderId)
-            if isinstance(result,str):
+        if orderInfo.status == Const.ORDER_STATUS_LIVE:
+            result = await self.sdk.cancel_spot_order(info.symbol, info.orderId)
+            if isinstance(result, str):
                 msg = f"binance sdk cancel_spot_order 删除订单失败:info={info.to_json()} result={result}"
                 logger.error(msg)
                 await TGBot.send_err_msg(msg)
@@ -670,27 +711,27 @@ class BinanceController(Controller):
                 msg = f"binance sdk cancel_spot_order 删除订单成功:info={info.to_json()}"
                 logger.info(msg)
                 await TGBot.send_close_msg(msg)
-        elif orderInfo.status==Const.ORDER_STATUS_FILLED :
-            result=await self.sdk.close_spot_order_by_market(info.symbol,info.size_exec)
-            if isinstance(result,str):
+        elif orderInfo.status == Const.ORDER_STATUS_FILLED:
+            result = await self.sdk.close_spot_order_by_market(info.symbol, info.size_exec)
+            if isinstance(result, str):
                 msg = f"binance sdk close_spot_by_order 订单市价平仓失败:info={info.to_json()} result={result}"
                 logger.error(msg)
                 await TGBot.send_err_msg(msg)
                 raise HTTPException(
                     status_code=Status.ExchangeError.value, detail=msg)
             else:
-                msg=f'binance close_spot_by_order  平仓成功 {info.to_json()} '
+                msg = f'binance close_spot_by_order  平仓成功 {info.to_json()} '
                 logger.info(msg)
                 await DataStore.del_orderinfo(info)
                 await TGBot.send_close_msg(msg)
-                if len(info.sl_id)>0:
-                    result=await self.sdk.cancel_spot_order(info.symbol,info.sl_id)
-                    if isinstance(result,str):
+                if len(info.sl_id) > 0:
+                    result = await self.sdk.cancel_spot_order(info.symbol, info.sl_id)
+                    if isinstance(result, str):
                         msg = f"binance sdk cancel_spot_order 删除订单止损失败:info={info.to_json()} result={result}"
                         logger.error(msg)
-                if len(info.tp_id)>0:
-                    result=await self.sdk.cancel_spot_order(info.symbol,info.tp_id)
-                    if isinstance(result,str):
+                if len(info.tp_id) > 0:
+                    result = await self.sdk.cancel_spot_order(info.symbol, info.tp_id)
+                    if isinstance(result, str):
                         msg = f"binance sdk cancel_spot_order 删除订单止盈失败:info={info.to_json()} result={result}"
                         logger.error(msg)
         else:
@@ -698,39 +739,37 @@ class BinanceController(Controller):
             logger.error(msg)
             await TGBot.send_err_msg(msg)
             raise HTTPException(
-                status_code=Status.ExchangeError.value, detail=msg)  
+                status_code=Status.ExchangeError.value, detail=msg)
         return True
 
-
-    async def close_spot_by_pos(self, symbol)->bool:
+    async def close_spot_by_pos(self, symbol) -> bool:
         del_list = []
         symbol = utils.get_spot_symbol(symbol, self.exdata.ex)
         for i in DataStore.order_info[self.exdata.id]:
-            if i.symbol == symbol and i.isswap == False and i.status==Const.ORDER_STATUS_FILLED:
+            if i.symbol == symbol and i.isswap == False and i.status == Const.ORDER_STATUS_FILLED:
                 result = await self.sdk.close_spot_order_by_market(i.symbol, i.size)
                 if isinstance(result, str):
                     msg = f"binance sdk close_spot_order_by_market 现货平仓失败:info={i.to_json()} result={result}"
                     logger.error(msg)
                     await TGBot.send_err_msg(msg)
                 else:
-                    msg=f'binance close_spot_by_pos 平仓成功 {i.to_json()}'
+                    msg = f'binance close_spot_by_pos 平仓成功 {i.to_json()}'
                     logger.info(msg)
                     await TGBot.send_close_msg(msg)
                     if len(i.sl_id) > 0:
-                        await self.sdk.cancel_spot_order(i.symbol,i.sl_id)
+                        await self.sdk.cancel_spot_order(i.symbol, i.sl_id)
                     if len(i.tp_id) > 0:
-                        await self.sdk.cancel_spot_order(i.symbol,i.tp_id)
+                        await self.sdk.cancel_spot_order(i.symbol, i.tp_id)
                     del_list.append(i)
         await DataStore.del_orderinfo(del_list)
         return True
-    
 
-    async def setlever(self,symbol:str,lever:int):
-        if len(symbol)==0:
-            for i,v in BinanceSdk.swap_baseinfo.items():
-                await self.sdk.setlever(i,lever)
+    async def setlever(self, symbol: str, lever: int):
+        if len(symbol) == 0:
+            for i, v in BinanceSdk.swap_baseinfo.items():
+                await self.sdk.setlever(i, lever)
                 await asyncio.sleep(0.1)
         else:
-            symbol=utils.get_swap_symbol(symbol,self.exdata.ex)
-            await self.sdk.setlever(symbol,lever) 
-        return True    
+            symbol = utils.get_swap_symbol(symbol, self.exdata.ex)
+            await self.sdk.setlever(symbol, lever)
+        return True

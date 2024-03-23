@@ -8,45 +8,51 @@ from . import OrderClass
 
 
 class BinanceSdk(SDKBase):
-    name ='binance'
-    _rest="https://fapi.binance.com"
-    spot_baseinfo={}
-    swap_baseinfo={}
+    name = 'binance'
+    _rest = "https://fapi.binance.com"
+    spot_baseinfo = {}
+    swap_baseinfo = {}
+
     def __init__(self, api_key: str, api_secret: str, api_password: str = None) -> None:
         super().__init__(api_key, api_secret, api_password)
 
-    @staticmethod    
-    def register_spot_kline(symbol:str,cb):
+    @staticmethod
+    def register_spot_kline(symbol: str, cb):
         if symbol in BinanceSdk.spot_baseinfo:
             return True
         return False
-    swap_reg=set()
-    spot_reg=set()
+    swap_reg = set()
+    spot_reg = set()
+
     @staticmethod
     def caculate_swap_url():
-        pass    
-    @staticmethod
-    def unregister_spot_kline(symbol:str):
         pass
-    @staticmethod    
-    def register_swap_kline(symbol:str):
+
+    @staticmethod
+    def unregister_spot_kline(symbol: str):
+        pass
+
+    @staticmethod
+    def register_swap_kline(symbol: str):
         if symbol in BinanceSdk.swap_baseinfo:
             if symbol not in BinanceSdk.swap_reg:
                 BinanceSdk.swap_reg.add(symbol)
             return True
         return False
+
     @staticmethod
-    def unregister_swap_kline(symbol:str):
+    def unregister_swap_kline(symbol: str):
         if symbol in BinanceSdk.swap_reg:
-           BinanceSdk.swap_reg.remove(symbol)
+            BinanceSdk.swap_reg.remove(symbol)
         pass
+
     @staticmethod
     def run_kline_ws():
         pass
+
     @staticmethod
     def stop_kline_ws():
         pass
-
 
     async def send_request(self, api):
         headers = {
@@ -67,6 +73,7 @@ class BinanceSdk(SDKBase):
                     return await response.text()
         except Exception as e:
             return f'{{"e": "{e}"}}'
+
     @staticmethod
     async def request_baseinfo():
         try:
@@ -103,15 +110,16 @@ class BinanceSdk(SDKBase):
                                         break
         except Exception as e:
             print(f'binance request_baseinfo spot err={e}')
-    async def request_swap_positions(self,symbol=None):
+
+    async def request_swap_positions(self, symbol=None):
         api = {
             "method": "GET",
             "url": "/fapi/v2/positionRisk",
             "payload": {
             }
         }
-        if isinstance(symbol,str):
-            api['payload']['symbol']=symbol
+        if isinstance(symbol, str):
+            api['payload']['symbol'] = symbol
         response = await self.send_request(api)
         result = json.loads(response)
         if isinstance(result, list):
@@ -126,16 +134,18 @@ class BinanceSdk(SDKBase):
                     sp.priceAvg = float(i['entryPrice'])
                     sp.upl = float(i['unRealizedProfit'])
                     sp.marginMode = i['marginType']
-                    if sp.marginMode=='cross':
-                        sp.margin=math.fabs(float(i['notional'])/int(i['leverage']))
+                    if sp.marginMode == 'cross':
+                        sp.margin = math.fabs(
+                            float(i['notional'])/int(i['leverage']))
                     else:
-                        sp.margin=math.fabs(float(i['isolatedMargin']))     
+                        sp.margin = math.fabs(float(i['isolatedMargin']))
                     _result.append(sp)
             return _result
         else:
             return result
 
-    async def request_swap_price(self, symbol):
+    @staticmethod
+    async def request_swap_price(symbol):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.request("GET", url=f"https://fapi.binance.com/fapi/v2/ticker/price?symbol={symbol}") as response:
@@ -147,7 +157,8 @@ class BinanceSdk(SDKBase):
         except Exception as e:
             return f'{{"e": "{e}"}}'
 
-    async def request_spot_price(self, symbol):
+    @staticmethod
+    async def request_spot_price(symbol):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.request("GET", url=f"https://api4.binance.com/api/v3/ticker/price?symbol={symbol}") as response:
@@ -199,7 +210,7 @@ class BinanceSdk(SDKBase):
             soi.symbol = symbol
             soi.orderId = str(json_data['orderId'])
             soi.posSide = json_data['positionSide'].lower()
-            
+
             if json_data['status'] == 'FILLED':
                 soi.status = 1
                 soi.size = float(json_data['executedQty'])
@@ -210,7 +221,7 @@ class BinanceSdk(SDKBase):
                 soi.priceAvg = float(json_data['avgPrice'])
             elif json_data['status'] == 'NEW':
                 soi.status = 0
-                soi.priceAvg =0
+                soi.priceAvg = 0
             else:
                 soi.status = -1
             return soi
@@ -240,9 +251,7 @@ class BinanceSdk(SDKBase):
             return (str(json_data['orderId']),)
         return response
 
-
-    
-    async def set_swap_sl(self, symbol: str, size: float, posSide: str, sl: float,ispos:bool):
+    async def set_swap_sl(self, symbol: str, size: float, posSide: str, sl: float, ispos: bool):
         api = {
             "method": "POST",
             "url": "/fapi/v1/order",
@@ -255,18 +264,18 @@ class BinanceSdk(SDKBase):
             }
         }
         if ispos:
-            api['payload']['type']='STOP_MARKET'
+            api['payload']['type'] = 'STOP_MARKET'
         else:
-            api['payload']['type']='STOP'
-            api['payload']['quantity']=size
-            api['payload']['price']=sl    
+            api['payload']['type'] = 'STOP'
+            api['payload']['quantity'] = size
+            api['payload']['price'] = sl
         response = await self.send_request(api)
         json_data = json.loads(response)
         if 'orderId' in json_data:
             return (str(json_data['orderId']),)
         return response
-    
-    async def set_swap_tp(self, symbol: str, size: float, posSide: str, tp: float,ispos:bool):
+
+    async def set_swap_tp(self, symbol: str, size: float, posSide: str, tp: float, ispos: bool):
         api = {
             "method": "POST",
             "url": "/fapi/v1/order",
@@ -276,16 +285,16 @@ class BinanceSdk(SDKBase):
                 'positionSide': posSide.upper(),
                 'quantity': size,
                 'stopPrice': tp,
-                'price':tp,
+                'price': tp,
                 'timeInForce': 'GTC'
             }
         }
         if ispos:
-            api['payload']['type']='TAKE_PROFIT_MARKET'
+            api['payload']['type'] = 'TAKE_PROFIT_MARKET'
         else:
-            api['payload']['type']= 'TAKE_PROFIT'
-            api['payload']['quantity']=size
-            api['payload']['price']=tp  
+            api['payload']['type'] = 'TAKE_PROFIT'
+            api['payload']['quantity'] = size
+            api['payload']['price'] = tp
 
         response = await self.send_request(api)
         json_data = json.loads(response)
@@ -326,7 +335,7 @@ class BinanceSdk(SDKBase):
         response = await self.send_request(api)
         json_data = json.loads(response)
         if 'orderId' in json_data:
-            return True
+            return (json_data['orderId'],)
         else:
             return response
 
@@ -389,7 +398,7 @@ class BinanceSdk(SDKBase):
                     'timeInForce': 'GTC'
             }
         }
-       
+
         response = await self.send_request(api)
         json_data = json.loads(response)
         if 'orderId' in json_data:
@@ -471,7 +480,7 @@ class BinanceSdk(SDKBase):
             return response
 
     # 查询现货总仓位
-    async def request_spot_positions(self,symbol=None):
+    async def request_spot_positions(self, symbol=None):
         api = {
             'rest': "https://api.binance.com",
             "method": "POST",
@@ -479,8 +488,8 @@ class BinanceSdk(SDKBase):
             "payload": {
             }
         }
-        if isinstance(symbol,str):
-            api['payload']['asset']=symbol
+        if isinstance(symbol, str):
+            api['payload']['asset'] = symbol
         response = await self.send_request(api)
         result = json.loads(response)
         if isinstance(result, list):
@@ -491,39 +500,39 @@ class BinanceSdk(SDKBase):
                     ai.symbol = i['asset']
                     ai.available = float(i['free'])
                     ai.total = ai.available+float(i['locked'])
-                    if ai.symbol!='USDT':
-                        ai.unrealizedPL = float(i['btcValuation'])    
+                    if ai.symbol != 'USDT':
+                        ai.unrealizedPL = float(i['btcValuation'])
                     _result.append(ai)
             return _result
         else:
             return response
-        
-    async def transfer(self,fromType: int, toType: int, usdt: float):
+
+    async def transfer(self, fromType: int, toType: int, usdt: float):
         api = {
             'rest': "https://api.binance.com",
             "method": "POST",
             "url": "/sapi/v1/asset/transfer",
             "payload": {
-                'type':'MAIN_UMFUTURE' if fromType==0 else 'UMFUTURE_MAIN',
-                'asset':'USDT',
-                'amount':usdt
+                'type': 'MAIN_UMFUTURE' if fromType == 0 else 'UMFUTURE_MAIN',
+                'asset': 'USDT',
+                'amount': usdt
             }
-            
+
         }
         response = await self.send_request(api)
         result = json.loads(response)
         if 'tranId' in result:
-            return True
+            return (result['result'],)
         else:
             return response
 
-    async def setlever(self,symbol:str,lever:int):
+    async def setlever(self, symbol: str, lever: int):
         api = {
             "method": "POST",
             "url": "/fapi/v1/leverage",
             "payload": {
-                'symbol':symbol,
-                'leverage':lever
+                'symbol': symbol,
+                'leverage': lever
             }
         }
         response = await self.send_request(api)
@@ -532,22 +541,38 @@ class BinanceSdk(SDKBase):
             return True
         else:
             return response
-    async def get_swap_pnl_history(self,symbol:str,starttime:datetime.datetime):
+
+    async def get_swap_pnl_history(self, symbol: str, orderId: str):
         api = {
             "method": "GET",
             "url": "/fapi/v1/userTrades",
             "payload": {
-                'symbol':symbol,
-                'startTime':str(int(starttime.timestamp()*1000))
+                'symbol': symbol,
+                'orderId': int(orderId)
             }
         }
         response = await self.send_request(api)
         result = json.loads(response)
-        if isinstance(result,list):
-            li=[]
+        if isinstance(result, list):
+            pnl=0
             for i in result:
-                if i['realizedPnl']!='0':
-                    li.append(float(i['realizedPnl']))
-            return li
+                if i['realizedPnl'] != '0':
+                    pnl+=float(i['realizedPnl'])
+            return pnl
+        else:
+            return response
+
+    async def get_saving_funding(self):
+        api = {
+            "method": "GET",
+            'rest': "https://api.binance.com",
+            "url": "/sapi/v1/simple-earn/account",
+            "payload": {
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'totalAmountInUSDT' in result :
+            return float(result['totalAmountInUSDT'])
         else:
             return response

@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import DataStore
 from OrderInfoDao import OrderInfoDB
-from RequestObject import AddExRequest, CancelOrderRequest, ClosePosRequest, CloseStrategyOrder, SetExSingalRequest, SetExStatusRequest, LoginRequest, MakeOrderRequest, ModifySlTp, SetLeverageRequest, SetMartinRequest, SetTGRequest, SetTrendRequest, StrategyOrderRequest, TvNotificationRequest
+from RequestObject import AddExRequest, CancelOrderRequest, ClosePosRequest, CloseStrategyOrder, SetExSingalRequest, SetExStatusRequest, LoginRequest, MakeOrderRequest, ModifySlTp, SetLeverageRequest, SetMartinRequest, SetProfitRequest, SetTGRequest, SetTrendRequest, StrategyOrderRequest, TvNotificationRequest
 from StatisticsDao import query_total_by_range
 import StrategyLogic
 import UserDao
@@ -393,6 +393,18 @@ async def set_trend(data: SetTrendRequest, token: str = Depends(get_token)):
     DataStore.update_trend_setting(data)  
     return {'data':DataStore.json_conf['Trend']}
 
+@app.post('/ts/api/set-profit-trans')
+async def set_transfer_profit(data: SetProfitRequest, token: str = Depends(get_token)):
+    user = await verify_token(token)
+    if user.privilege <= 1:
+        return JSONResponse(status_code=Status.UserUnauthorized.value, content={"message": "用户权限不足"})
+    if data.ratio>=0 and data.ratio<=1:
+        DataStore.json_conf['TransferProfit']=data.ratio
+        DataStore.write_json_conf() 
+        return {'data':DataStore.json_conf['TransferProfit']}
+    else:
+        return JSONResponse(status_code=Status.ParamsError.value, content={"message": "转移利润比例应该在0-1之间"})
+
 def run(task):
     app.add_event_handler('startup',lambda:asyncio.create_task(task()))
-    uvicorn.run(app, host="0.0.0.0", port=3001,loop="auto")
+    uvicorn.run(app, host="127.0.0.1", port=3001,loop="auto")

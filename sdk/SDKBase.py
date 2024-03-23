@@ -1,8 +1,9 @@
 from hashlib import sha256
 import base64
+import hashlib
 import hmac
 import math
-
+import base64
 
 class SDKBase:
     def __init__(self, api_key: str, api_secret: str, api_password: str = None) -> None:
@@ -31,6 +32,7 @@ class SDKBase:
         signature = hmac.new(api_secret.encode(
             "utf-8"), payload.encode("utf-8"), digestmod=sha256).hexdigest()
         return signature
+
 
     def praseParam(self, paramsMap: dict):
         sortedKeys = sorted(paramsMap)

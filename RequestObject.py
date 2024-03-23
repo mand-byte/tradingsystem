@@ -102,6 +102,9 @@ class SetTrendRequest(BaseModel):
     tp:float
     sl:float
 
+class SetProfitRequest(BaseModel):
+    ratio:float    
+
 class SetTGRequest(BaseModel):
     TG_report_err:bool
     TG_report_open:bool

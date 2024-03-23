@@ -447,6 +447,41 @@ class BitgetSdk(SDKBase):
             return (result['data']['orderId'],)
         else:
             return response
+        
+    async def get_swap_history_by_subpos(self,symbol:str,subPos):
+        _subpos=''
+        if isinstance(subPos,str):
+            _subpos=subPos
+        elif isinstance(subPos,list):
+            _subpos=sorted(subPos, key=int, reverse=True)[0]
+        api = {
+            "method": "GET",
+            "url": "/api/v2/copy/mix-trader/order-history-track",
+            "payload": {
+                'symbol': symbol,
+                'productType': 'USDT-FUTURES',
+                'idLessThan': _subpos,
+                'limit':1 if isinstance(subPos,str) else len(subPos)
+
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'code' in result and result['code'] == "00000":
+            if isinstance(subPos,str):
+                for i in result['data']['trackingList']:
+                    if i['trackingNo']==subPos:
+                        return float(i['achievedPL'])
+            else:
+                pnl=0.0
+                for i in subPos:
+                    for x in result['data']['trackingList']:
+                        if i==x['trackingNo']:
+                            pnl+= float(x['achievedPL'])
+                            break
+                return pnl        
+        else:
+            return response    
 
     async def set_spot_sltp_by_copytrader(self,subposId,sl,tp):
         api = {
@@ -817,7 +852,7 @@ class BitgetSdk(SDKBase):
             "method": "POST",
             "url": "/api/v2/spot/wallet/transfer",
             "payload": {
-                'fromType': 'spot' if fromType == 0 else "usdt_futures",
+                'fromType': 'usdt_futures' if fromType == 1 else "spot",
                 'toType': 'spot' if toType == 0 else "usdt_futures",
                 'amount':str(usdt),
                 'coin':'USDT'
@@ -826,7 +861,7 @@ class BitgetSdk(SDKBase):
         response = await self.send_request(api)
         result = json.loads(response)
         if 'code' in result and result['code'] == "00000":
-            return True
+            return (result['data']['transferId'],)
         else:
             return response
         
@@ -847,27 +882,22 @@ class BitgetSdk(SDKBase):
         if 'code' in result and result['code'] == "00000":
             return True
         return result
-    async def get_swap_pnl_history(self,symbol:str,starttime:datetime.datetime):
+    
+    async def get_saving_funding(self):
         api = {
             "method": "GET",
-            "url": "/api/v2/mix/order/fills",
+            "url": "/api/v2/earn/savings/account",
             "payload": {
-                'productType':'USDT-FUTURES',
-                'symbol':symbol,
-                'startTime':str(int(starttime.timestamp()*1000))
+                'ccy': "USDT"
             }
         }
         response = await self.send_request(api)
         result = json.loads(response)
         if 'code' in result and result['code'] == "00000":
-            li=[]
-            for i in result['data']['fillList']:
-                if i['tradeSide']=='close':
-                    li.append(float(i['realizedPnl']))
-            #颠倒顺序，符合本地数据库记录的顺序        
-            if len(li)>0:
-                li=li[::-1]        
-            return li
+            return float(result['data']['usdtAmount'])
+            
         else:
-            return response            
+            return response
+
+             
 

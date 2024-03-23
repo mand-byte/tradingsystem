@@ -45,6 +45,8 @@
         "TREND_FIXED_INVEST": 200,
         "------TREND_TP_RATIO------": "趋势下单take profit 比例，设为0 只用tv信号平仓",
         "TREND_TP_RATIO": 0,
-        "TREND_SL_RATIO": 0.025
-    }
+        "TREND_SL_RATIO": 0.028
+    },
+    "------TransferProfit------": "每次平仓后的盈利，转移多少到现金/资金账户",
+    "TransferProfit":0.4
 }

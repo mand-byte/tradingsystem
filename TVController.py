@@ -87,25 +87,55 @@ async def make_tv_order(data):
                 
                 if DataStore.json_conf['Trend']['TREND_TP_RATIO'] > 0:
                     if data.action == "buy" and data.market_position == "long":
-                        tp = round(
+                        _tp = round(
                             float(data.price)*(1+DataStore.json_conf['Trend']['TREND_TP_RATIO']), 1)
+                        if match:
+                            if _tp>float(match[0]):
+                                tp=_tp
+                            else:
+                                tp=float(match[0])
+                        else:
+                            tp=_tp 
                     else:
-                        tp = round(
+                        _tp = round(
                             float(data.price)*(1-DataStore.json_conf['Trend']['TREND_TP_RATIO']), 1)
+                        if match:
+                            if _tp<float(match[0]):
+                                tp=_tp
+                            else:
+                                tp=float(match[0])
+                        else:
+                            tp=_tp           
+                        
+
                 else:
                     if match:
                         tp = float(match[0])
-
+                    
                 if DataStore.json_conf['Trend']['TREND_SL_RATIO'] > 0:
                     if data.action == "buy" and data.market_position == "long":
-                        sl = round(
+                        _sl = round(
                             float(data.price)*(1-DataStore.json_conf['Trend']['TREND_SL_RATIO']), 1)
+                        if match:
+                            if _sl>float(match[1]):
+                                sl=_sl
+                            else:
+                                sl=float(match[1])
+                        else:
+                            sl=_sl 
                     else:
-                        sl = round(
+                        _sl = round(
                             float(data.price)*(1+DataStore.json_conf['Trend']['TREND_SL_RATIO']), 1)
+                        if match:
+                            if _sl<float(match[1]):
+                                sl=_sl
+                            else:
+                                sl=float(match[1])
+                        else:
+                            sl=_sl 
                 else:
                     if match:
-                        sl = float(match[1])        
+                        sl = float(match[1])                
                 for id, value in DataStore.controller_list.items():
                     try:
                         if DataStore.json_conf['Trend']['TREND_INVEST_USE_RATIO']:

@@ -86,7 +86,10 @@ async def handle_day_command(msg, event):
         for id, acc in DataStore.swap_account.items():
             total = total+acc.total
         for id, acc in DataStore.spot_account.items():
-            total = total+acc.total+acc.unrealizedPL    
+            if DataStore.controller_list[id].exdata.ex == 'nexo':
+                total += acc.unrealizedPL
+            else:    
+                total = total+acc.total+acc.unrealizedPL+acc.funding  
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         await event.respond(f"{today}总金额为{total:.2f}")
 
@@ -159,7 +162,13 @@ async def handle_position_command(msg, event):
     msg = ""
     for ex in DataStore.ex_list:
         id = ex.id
-        msg += f"{ex.ex} {ex.account} 详情：总资产:{0 if (id not in DataStore.swap_account) else DataStore.swap_account[id].total:.2f}\n"
+        total=0
+        if id in DataStore.swap_account:
+            if ex.ex=='nexo':
+                total=DataStore.swap_account[id].total+DataStore.spot_account[id].funding
+            else:
+                total=DataStore.swap_account[id].total+DataStore.spot_account[id].funding+DataStore.spot_account[id].total
+        msg += f"{ex.ex} {ex.account} 详情：总资产:{total:.2f}\n"
         msg += "现货持仓:\n"
         if id in DataStore.spot_positions:
             for spot in DataStore.spot_positions[id]:
@@ -168,7 +177,7 @@ async def handle_position_command(msg, event):
         if id in DataStore.swap_positions:
             for swap in DataStore.swap_positions[id]:
                 msg += f"{swap.symbol} 方向:{swap.posSide} 持仓模式:{swap.marginMode} 杠杆:{swap.leverage} 均价:{swap.priceAvg:.4f} 仓位:{swap.size} 未盈利:{swap.upl:.4f}\n"
-
+        msg += '\n'
     if len(msg) > 0:
         await event.respond(msg)
     else:
