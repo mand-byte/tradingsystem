@@ -64,24 +64,24 @@ class BitgetController(Controller):
 
     async def every_min_task(self):
         spot_list = await self.sdk.request_spot_positions()
+        spot_acc = DataStore.spot_account[self.exdata.id]
+        swap_acc = DataStore.swap_account[self.exdata.id]
         if isinstance(spot_list, list):
             filtered_elements = [
                 element for element in spot_list if element.symbol == "USDT"]
             remaining_elements = [
                 element for element in spot_list if element.symbol != "USDT"]
-            spot_acc = DataStore.spot_account[self.exdata.id]
+            
             if filtered_elements:
                 spot_acc.available = filtered_elements[0].available
                 spot_acc.total = filtered_elements[0].total
-                spot_acc.unrealizedPL = filtered_elements[0].unrealizedPL
                 DataStore.spot_positions[self.exdata.id] = remaining_elements
                 spot_total = sum(
                     spot.unrealizedPL for spot in remaining_elements)
-                filtered_elements[0].unrealizedPL = spot_total
+                spot_acc.unrealizedPL = spot_total
             else:
                 spot_acc.total = 0
                 spot_acc.available = 0
-                spot_acc.unrealizedPL = 0
                 DataStore.spot_positions[self.exdata.id] = spot_list
                 spot_total = sum(spot.unrealizedPL for spot in spot_list)
                 spot_acc.unrealizedPL = spot_total
@@ -92,10 +92,9 @@ class BitgetController(Controller):
         if isinstance(swap_list, list):
             DataStore.swap_positions[self.exdata.id] = swap_list
         else:
-            DataStore.swap_positions[self.exdata.id] = []
+            DataStore.swap_positions[self.exdata.id].clear()
         swap_account = await self.sdk.request_swap_account()
         if not isinstance(swap_account, str):
-            swap_acc = DataStore.swap_account[self.exdata.id]
             swap_acc.available = swap_account.available
             swap_acc.symbol = swap_account.symbol
             swap_acc.total = swap_account.total
@@ -671,7 +670,7 @@ class BitgetController(Controller):
         pnl = await self.sdk.get_swap_history_by_subpos(symbol, id)
         if isinstance(pnl, float):
             if pnl > 0:
-                _pnl = pnl*DataStore.json_conf['TransferProfit']
+                _pnl = round(pnl*DataStore.json_conf['TransferProfit'],4)
                 result = await self.sdk.transfer(1, 0, _pnl)
                 if isinstance(result, tuple):
                     msg = f"bitget symbol={symbol} 盈利 {pnl} 划转 {_pnl} 到资金账户 tranId={result[0]}"

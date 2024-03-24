@@ -214,10 +214,8 @@ async def every20minTask():
         db.datetime=today
         db.money=acc.total
         if id in spot_account:
-            if controller_list[id].exdata.ex !='nexo':
-                db.money+=spot_account[id].unrealizedPL+spot_account[id].total+spot_account[id].funding
-            else:
-                db.money+=spot_account[id].unrealizedPL    
+            db.money+=spot_account[id].unrealizedPL+spot_account[id].total+spot_account[id].funding
+               
         db.exId=id
         l.append(db)
         total+=db.money

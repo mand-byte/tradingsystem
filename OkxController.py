@@ -65,23 +65,23 @@ class OkxController(Controller):
         else:
             DataStore.swap_positions[self.exdata.id] = []
         swap_account = await self.sdk.request_swap_account()
-        DataStore.spot_account[self.exdata.id] = AccountInfo()
+        swap_acc = DataStore.swap_account[self.exdata.id]
+        spot_acc = DataStore.spot_account[self.exdata.id]
         if not isinstance(swap_account, str):
-            swap_acc = DataStore.swap_account[self.exdata.id]
             swap_acc.available = swap_account[0].available
             swap_acc.symbol = swap_account[0].symbol
             swap_acc.total = swap_account[0].total
             swap_acc.unrealizedPL = swap_account[0].unrealizedPL
             DataStore.spot_positions[self.exdata.id] = swap_account[1]
             spot_total = sum(spot.unrealizedPL for spot in swap_account[1])
-            DataStore.spot_account[self.exdata.id].unrealizedPL = spot_total
+            spot_acc.unrealizedPL = spot_total
 
         saving = await self.sdk.get_saving_funding()
         if isinstance(saving, float):
-            DataStore.spot_account[self.exdata.id].funding = saving
+            spot_acc.funding = saving
         balance = await self.sdk.get_asset_balance()
         if isinstance(saving, float):
-            DataStore.spot_account[self.exdata.id].funding += balance
+            spot_acc.funding += balance
         del_list: set = set()
         update_list: set = set()
         swap_subpos: Dict[str:Dict[str:str]] = {}
@@ -540,8 +540,8 @@ class OkxController(Controller):
         pnl = await self.sdk.get_swap_history_by_subpos(symbol, id)
         if isinstance(pnl, float):
             if pnl > 0:
-                _pnl = pnl*DataStore.json_conf['TransferProfit']
-                result = await self.sdk.transfer(0, 1, _pnl)
+                _pnl = round(pnl*DataStore.json_conf['TransferProfit'],4)
+                result = await self.sdk.transfer(0, 1,_pnl)
                 if isinstance(result, tuple):
                     msg = f"okx symbol={symbol} 盈利 {pnl} 划转 {_pnl} 到资金账户 tranId={result[0]}"
                     logger.info(msg)

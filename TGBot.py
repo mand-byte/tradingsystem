@@ -164,10 +164,8 @@ async def handle_position_command(msg, event):
         id = ex.id
         total=0
         if id in DataStore.swap_account:
-            if ex.ex=='nexo':
-                total=DataStore.swap_account[id].total+DataStore.spot_account[id].funding
-            else:
-                total=DataStore.swap_account[id].total+DataStore.spot_account[id].funding+DataStore.spot_account[id].total
+            
+            total=DataStore.swap_account[id].total+DataStore.spot_account[id].funding+DataStore.spot_account[id].total+DataStore.spot_account[id].unrealizedPL
         msg += f"{ex.ex} {ex.account} 详情：总资产:{total:.2f}\n"
         msg += "现货持仓:\n"
         if id in DataStore.spot_positions:

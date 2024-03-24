@@ -265,16 +265,15 @@ class NexoSdk(SDKBase):
         if 'positions' in result:
             _result = []
             for i in result['positions']:
-                if float(i['positionAmt']) != 0:
-                    sp = OrderClass.SwapPostion()
-                    sp.leverage = i['leverage']
-                    sp.symbol = i['instrument']
-                    sp.posSide = i['side'].lower()
-                    sp.size = i['amount']
-                    sp.priceAvg = i['entryPrice']
-                    sp.upl = float(i['unrealizedPnl'])
-                    sp.margin=math.fabs(float(i['lockedCollateral']))     
-                    _result.append(sp)
+                sp = OrderClass.SwapPostion()
+                sp.leverage = i['leverage']
+                sp.symbol = i['instrument']
+                sp.posSide = i['side'].lower()
+                sp.size = i['amount']
+                sp.priceAvg = i['entryPrice']
+                sp.upl = float(i['unrealizedPnl'])
+                sp.margin=math.fabs(float(i['lockedCollateral']))     
+                _result.append(sp)
             return _result
         else:
             return response         

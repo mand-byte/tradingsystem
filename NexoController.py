@@ -76,10 +76,9 @@ class NexoController(Controller):
                 swap_acc.symbol = filtered_elements[0].symbol
                 swap_acc.total = filtered_elements[0].total
                 swap_acc.unrealizedPL = filtered_elements[0].unrealizedPL
-                spot_acc.available = filtered_elements[0].available
+                spot_acc.available = 0
                 spot_acc.symbol = filtered_elements[0].symbol
-                spot_acc.total = filtered_elements[0].total
-                spot_acc.unrealizedPL = filtered_elements[0].unrealizedPL
+                spot_acc.total = 0
                 DataStore.spot_positions[self.exdata.id] = remaining_elements
                 if len(remaining_elements) > 0:
 

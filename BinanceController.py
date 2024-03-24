@@ -497,16 +497,16 @@ class BinanceController(Controller):
 
     async def get_swap_pnl(self, symbol: str, orderId: str):
         await asyncio.sleep(2)
-        profit = await self.sdk.get_swap_pnl_history(symbol, orderId)
-        if isinstance(profit, float):
-            if profit > 0:
-                _profit = profit*DataStore.json_conf['TransferProfit']
-                result = await self.sdk.transfer(1, 0, _profit)
+        pnl = await self.sdk.get_swap_pnl_history(symbol, orderId)
+        if isinstance(pnl, float):
+            if pnl > 0:
+                _pnl = round(pnl*DataStore.json_conf['TransferProfit'],4)
+                result = await self.sdk.transfer(1, 0, _pnl)
                 if isinstance(result, tuple):
-                    msg = f"binance symbol={symbol} 盈利 {profit} 划转 {_profit} 到现金账户 tranId={result[0]}"
+                    msg = f"binance symbol={symbol} 盈利 {pnl} 划转 {_pnl} 到现金账户 tranId={result[0]}"
                     logger.info(msg)
                 else:
-                    msg = f"binance symbol={symbol} 盈利 {profit} 划转 {_profit} 到现金账户失败  err={result}"
+                    msg = f"binance symbol={symbol} 盈利 {pnl} 划转 {_pnl} 到现金账户失败  err={result}"
                     logger.error(msg)
                     await TGBot.send_err_msg(msg)
         else:
