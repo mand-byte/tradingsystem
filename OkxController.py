@@ -1,4 +1,5 @@
 import asyncio
+import math
 from typing import Dict
 from fastapi import HTTPException
 import schedule
@@ -13,6 +14,9 @@ import utils
 import DataStore
 import Const
 import TGBot
+import MovingAssetDao
+from MovingAssetDao import MovingAssetDB
+import datetime
 
 
 class OkxController(Controller):
@@ -22,8 +26,11 @@ class OkxController(Controller):
             exdata.apikey, exdata.api_secret, exdata.api_password)
         self.exdata = exdata
         self.job = None
+        self.check_profit = False
+        self.movingData: MovingAssetDB = None
 
     async def init(self):
+        self.movingData = await MovingAssetDao.MovingAssetDB_query(self.exdata.id)
         await self.sdk.init()
         await self.every_min_task()
 
@@ -62,8 +69,7 @@ class OkxController(Controller):
         swap_list = await self.sdk.request_swap_positions()
         if isinstance(swap_list, list):
             DataStore.swap_positions[self.exdata.id] = swap_list
-        else:
-            DataStore.swap_positions[self.exdata.id] = []
+
         swap_account = await self.sdk.request_swap_account()
         swap_acc = DataStore.swap_account[self.exdata.id]
         spot_acc = DataStore.spot_account[self.exdata.id]
@@ -176,9 +182,13 @@ class OkxController(Controller):
             await DataStore.update_orderinfo(update_list)
         if len(del_list) > 0:
             await DataStore.del_orderinfo(del_list)
-        if DataStore.json_conf['TransferProfit'] > 0:
-            for i, v in del_subpos:
+        if DataStore.json_conf['TransferProfit'] > 0 and len(del_subpos) > 0:
+            self.check_profit = True
+            for i, v in del_subpos.items():
                 asyncio.create_task(self.get_swap_pnl(i, v))
+
+        if self.movingData == None and self.check_profit == False and math.floor(swap_acc.available*1000) == math.floor(swap_acc.total*1000) and swap_acc.unrealizedPL == 0 and self.exdata.no_move_asset == False and swap_acc.total > 1 and len(swap_list) == 0:
+            await self.move_asset_to_simpleearn(math.floor(swap_acc.total*10**4)/10**4)
 
     async def setlever(self, symbol: str, lever: int):
         if len(symbol) == 0:
@@ -193,6 +203,7 @@ class OkxController(Controller):
 
 ################################################################################################################################################################
 
+
     async def _make_swap_order(self, symbol: str, money: float, posSide: str, price: float, orderType: int):
         symbol = utils.get_swap_symbol(symbol, self.exdata.ex)
         if symbol not in self.sdk.swap_baseinfo:
@@ -200,6 +211,8 @@ class OkxController(Controller):
             logger.error(msg)
             raise HTTPException(
                 status_code=Status.ExchangeError.value, detail=msg)
+        if self.exdata.no_move_asset==False and self.movingData!=None:
+            await self.move_asset_to_future()
         size = 0
         if orderType == Const.ORDER_TYPE_MARKET:
             mark_price = await self.sdk.request_swap_price(symbol)
@@ -340,6 +353,7 @@ class OkxController(Controller):
                     await DataStore.del_orderinfo(info)
                     await TGBot.send_close_msg(msg)
                     if DataStore.json_conf['TransferProfit'] > 0:
+                        self.check_profit = True
                         asyncio.create_task(self.get_swap_pnl(
                             info.symbol, info.subPosId))
             else:
@@ -404,6 +418,7 @@ class OkxController(Controller):
                     if len(i.subPosId) > 0:
                         subposIds.append(i.subPosId)
             if DataStore.json_conf['TransferProfit'] > 0 and len(subposIds) > 0:
+                self.check_profit = True
                 asyncio.create_task(self.get_swap_pnl(symbol, subposIds))
         # for i in DataStore.sltp_market[self.exdata.id]:
         #     if i.symbol==symbol and i.posSide==posSide and i.isswap:
@@ -540,11 +555,19 @@ class OkxController(Controller):
         pnl = await self.sdk.get_swap_history_by_subpos(symbol, id)
         if isinstance(pnl, float):
             if pnl > 0:
-                _pnl = round(pnl*DataStore.json_conf['TransferProfit'],4)
-                result = await self.sdk.transfer(0, 1,_pnl)
+                _pnl = math.floor(pnl*DataStore.json_conf['TransferProfit'] * 10**4) / 10**4
+                result = await self.sdk.transfer(1, 0, _pnl)
                 if isinstance(result, tuple):
                     msg = f"okx symbol={symbol} 盈利 {pnl} 划转 {_pnl} 到资金账户 tranId={result[0]}"
                     logger.info(msg)
+                    result = await self.sdk.move_fedeem_simple_earn(_pnl, True)
+                    if isinstance(result, str):
+                        msg = f"okx get_swap_pnl 申购活期理财 {_pnl} 失败  err={result}"
+                        logger.error(msg)
+                        await TGBot.send_err_msg(msg)
+                    else:
+                        msg = f"okx get_swap_pnl 申购活期理财 {_pnl} 成功 "
+                        logger.info(msg)
                 else:
                     msg = f"okx symbol={symbol} 盈利 {pnl} 划转 {_pnl} 到资金账户失败 err={result}"
                     logger.error(msg)
@@ -553,7 +576,7 @@ class OkxController(Controller):
             msg = f"okx get_swap_history_by_subpos 错误 symbol={symbol} subPosId={id} err={result}"
             logger.error(msg)
             await TGBot.send_err_msg(msg)
-
+        self.check_profit = False
 
 ################################################### SPOT#############################################################################################################
 
@@ -859,3 +882,47 @@ class OkxController(Controller):
             await DataStore.update_orderinfo(info)
 
         return info
+
+    async def move_asset_to_simpleearn(self, money: float):
+        result = await self.sdk.transfer(1, 0, money)
+        if isinstance(result, str):
+            msg = f"okx move_asset_to_simpleearn 转移资金到现金账户失败: result={result}"
+            logger.error(msg)
+            await TGBot.send_err_msg(msg)
+            return
+
+        result = await self.sdk.move_fedeem_simple_earn( money,True)
+        if isinstance(result, str):
+            msg = f"okx move_asset_to_simpleearn 申购活期理财失败: result={result}"
+            logger.error(msg)
+            await TGBot.send_err_msg(msg)
+            await self.sdk.transfer(0, 1, money)
+            return
+        else:
+            msg = f"okx move_to_simple_earn 申购活期理财成功 资金为{money}"
+            logger.info(msg)
+        db = MovingAssetDB(exid=self.exdata.id, money= money, datetime= datetime.datetime.now(), transid='')
+        await MovingAssetDao.MovingAssetDB_Insert(db)
+        self.movingData = db
+
+    async def move_asset_to_future(self):
+        result = await self.sdk.move_fedeem_simple_earn( self.movingData.money,False)
+        if isinstance(result, str):
+            msg = f"okx move_asset_to_future 从活期理财提取资金{self.movingData.money}失败: result={result}"
+            logger.error(msg)
+            return
+        else:
+            msg = f"okx move_asset_to_future 从活期理财提取资金{self.movingData.money}成功"
+            logger.info(msg)
+        result = await self.sdk.transfer(0, 1, self.movingData.money)
+        if isinstance(result, str):
+            msg = f"okx move_asset_to_future 转移资金{self.movingData.money}到合约账户失败: result={result}"
+            logger.error(msg)
+            await TGBot.send_err_msg(msg)
+            return
+        else:
+            msg = f"okx move_asset_to_future 转移资金{self.movingData.money}到合约账户成功"
+            logger.info(msg)
+        self.movingData.isdelete = True
+        await MovingAssetDao.MovingAssetDB_Update(self.movingData)
+        self.movingData = None

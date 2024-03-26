@@ -132,10 +132,11 @@ async def set_ex_status(data:SetExStatusRequest):
                                 detail=f"设置交易所状态信息错误 err={e}")
 
 async def set_ex_tvsingal(data:SetExSingalRequest):
-    result=await ExchangeDao.set_tv_singal(data.id,data.no_open,data.no_close)
+    result=await ExchangeDao.set_tv_singal(data.id,data.no_open,data.no_close,data.no_move_asset)
     if result and data.id in controller_list:
         controller_list[data.id].exdata.no_close=data.no_close
         controller_list[data.id].exdata.no_open=data.no_open
+        controller_list[data.id].exdata.no_move_asset=data.no_move_asset
     return result
     
 def update_martin_setting(data:SetMartinRequest):

@@ -88,6 +88,7 @@ class SetExSingalRequest(BaseModel):
     
     no_open:int
     no_close:int
+    no_move_asset:int
 
 class SetMartinRequest(BaseModel):
     use_ratio:bool

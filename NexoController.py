@@ -24,7 +24,8 @@ class NexoController(Controller):
         self.exdata = exdata
         self.job = None
         self.job2 = None
-
+        self.check_profit=False
+        
     async def init(self):
         await self.every_min_task()
         self.job = schedule.every(DataStore.json_conf['DATA_REFRESH_TIME']).seconds.do(
@@ -207,7 +208,9 @@ class NexoController(Controller):
         logger.info(msg)
         await TGBot.send_open_msg(msg)
         if orderType == Const.ORDER_TYPE_MARKET:
-            pass
+            info.status = Const.ORDER_STATUS_FILLED
+            info.size_exec = info.size
+            await DataStore.update_orderinfo(info)
             # if sl > 0:
             #     result =await self.sdk.set_swap_sl(
             #         info.symbol, info.size, info.posSide, sl, False)

@@ -13,6 +13,7 @@ class ExchangeDb:
         self.api_password = kwargs.get('api_password','')
         self.no_open = kwargs.get('no_open',False)
         self.no_close = kwargs.get('no_close',False)
+        self.no_move_asset = kwargs.get('no_move_asset',False)
         self.deleted = kwargs.get('deleted',False)
     def to_json(self):
         return {
@@ -21,16 +22,17 @@ class ExchangeDb:
             "account": self.account,
             'no_open':self.no_open,
             'no_close':self.no_close,
+            'no_move_asset':self.no_move_asset,
             'deleted':self.deleted
         }
 async def insert(db:ExchangeDb):
     from DataStore import db_pool
     insert_query = (
-        "INSERT INTO exchange_info (ex, account, apikey, api_secret, api_password, deleted,no_open,no_close) "
-        "VALUES (%s, %s, %s, %s, %s, %s,%s,%s)"
+        "INSERT INTO exchange_info (ex, account, apikey, api_secret, api_password, deleted,no_open,no_close,no_move_asset) "
+        "VALUES (%s, %s, %s, %s, %s, %s,%s,%s,%s)"
     )
     parameters = (
-        db.ex, db.account, db.apikey, db.api_secret, db.api_password, db.deleted,db.no_open,db.no_close
+        db.ex, db.account, db.apikey, db.api_secret, db.api_password, db.deleted,db.no_open,db.no_close,db.no_move_asset
     )
     try:
         async with db_pool.acquire() as conn:
@@ -72,10 +74,10 @@ async def delete_soft(id: int):
         logger.error(f"exchange_info 表软删除错误: {e} id={id}")
         return False
     
-async def set_tv_singal(id:int,no_open:bool,no_close:bool):
+async def set_tv_singal(id:int,no_open:bool,no_close:bool,no_move_asset:bool):
     from DataStore import db_pool
-    update_query = "UPDATE exchange_info SET no_open = %s, no_close = %s WHERE id = %s"
-    parameters = (no_open,no_close,id)
+    update_query = "UPDATE exchange_info SET no_open = %s, no_close = %s, no_move_asset = %s WHERE id = %s"
+    parameters = (no_open,no_close,no_move_asset,id)
     
     try:
         async with db_pool.acquire() as conn:

@@ -11,7 +11,7 @@
  Target Server Version : 100521 (10.5.21-MariaDB-0+deb11u1)
  File Encoding         : 65001
 
- Date: 09/02/2024 17:14:45
+ Date: 27/03/2024 01:38:21
 */
 
 SET NAMES utf8mb4;
@@ -27,7 +27,7 @@ CREATE TABLE `TradingStatistics` (
   `money` float DEFAULT NULL,
   `exId` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=31387 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=51831 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Table structure for exchange_info
@@ -43,8 +43,23 @@ CREATE TABLE `exchange_info` (
   `deleted` tinyint(1) DEFAULT NULL,
   `no_open` tinyint(1) DEFAULT 0,
   `no_close` tinyint(1) DEFAULT 0,
+  `no_move_asset` tinyint(1) DEFAULT 0,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ----------------------------
+-- Table structure for moving_asset_info
+-- ----------------------------
+DROP TABLE IF EXISTS `moving_asset_info`;
+CREATE TABLE `moving_asset_info` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `exid` int(11) NOT NULL,
+  `datetime` datetime DEFAULT NULL,
+  `money` float DEFAULT NULL,
+  `isdelete` tinyint(4) DEFAULT NULL,
+  `transid` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
 -- ----------------------------
 -- Table structure for order_info
@@ -74,7 +89,7 @@ CREATE TABLE `order_info` (
   `orderType` int(13) DEFAULT NULL COMMENT '订单类型，0市价，1限价',
   `sltp_status` int(13) DEFAULT NULL COMMENT '订单止盈止损状态0未设1未生效2已经生效',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=99 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=486 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ----------------------------
 -- Table structure for sltp_market

@@ -10,11 +10,11 @@ from . import OrderClass
 class OkxSdk(SDKBase):
     name = "okx"
     _rest = "https://aws.okx.com"
-    spot_baseinfo={}
-    swap_baseinfo={}
+    spot_baseinfo = {}
+    swap_baseinfo = {}
+
     def __init__(self, api_key: str, api_secret: str, api_password: str = None) -> None:
         super().__init__(api_key, api_secret, api_password)
-
 
     def count_pos_by_price(self, minQty, money, price, lever=10):
         sz = price/lever*minQty
@@ -41,10 +41,11 @@ class OkxSdk(SDKBase):
                 self.spot_copytrader = False
         else:
             self.swap_copytrader = False
-            self.spot_copytrader = False    
+            self.spot_copytrader = False
+
     async def init(self):
         await self.getConf()
-        
+
     async def send_request(self, api):
         headers = {
             "OK-ACCESS-KEY": self.keyconf['apiKey'],
@@ -88,6 +89,7 @@ class OkxSdk(SDKBase):
                         return await response.text()
         except Exception as e:
             return f'{{"e": "{e}"}}'
+
     @staticmethod
     async def request_baseinfo():
         try:
@@ -101,7 +103,7 @@ class OkxSdk(SDKBase):
                         for d in data:
                             if d['state'] == 'live':
                                 OkxSdk.swap_baseinfo[d['instId']] = float(
-                                    d['ctVal'])        
+                                    d['ctVal'])
         except Exception as e:
             print(f'okx request_baseinfo swap err={e}')
         try:
@@ -117,7 +119,7 @@ class OkxSdk(SDKBase):
                                 OkxSdk.spot_baseinfo[d['instId']] = float(
                                     d['minSz'])
         except Exception as e:
-            print(f'okx request_baseinfo spot err={e}')   
+            print(f'okx request_baseinfo spot err={e}')
 
     async def request_swap_price(self, symbol):
         api = {
@@ -233,7 +235,7 @@ class OkxSdk(SDKBase):
                 account.available = float(i['availBal'])
                 account.total = float(i['cashBal'])
                 account.unrealizedPL = float(i['upl'])
-                account.total+=account.unrealizedPL
+                account.total += account.unrealizedPL
                 if account.symbol == 'USDT':
                     usdt = account
                 else:
@@ -373,40 +375,40 @@ class OkxSdk(SDKBase):
 
     async def modify_spot_sl_tp(self, symbol: str, size: float, algoClOrdId: str, sl: float, tp: float):
         return self.modify_swap_sl_tp(symbol, size, algoClOrdId, sl, tp)
-    
-    #tdmode 0为逐仓，1为全仓 2为cash 3为spot_isolated：现货逐仓(仅适用于现货带单)
-    async def set_sltp(self,symbol:str,size:float,posSide:str,sl:float,tp:float,sltp_type:int,tdmode:int):
+
+    # tdmode 0为逐仓，1为全仓 2为cash 3为spot_isolated：现货逐仓(仅适用于现货带单)
+    async def set_sltp(self, symbol: str, size: float, posSide: str, sl: float, tp: float, sltp_type: int, tdmode: int):
         api = {
             "method": "POST",
             "url": "/api/v5/trade/order-algo",
             "payload": {
                 'instId': symbol,
-                'tdMode':'isolated' if tdmode==0 else 'cross' if tdmode==1 else 'cash' if tdmode==2 else 'spot_isolated',
-                'reduceOnly':True,
-                'cxlOnClosePos':True
+                'tdMode': 'isolated' if tdmode == 0 else 'cross' if tdmode == 1 else 'cash' if tdmode == 2 else 'spot_isolated',
+                'reduceOnly': True,
+                'cxlOnClosePos': True
             }
         }
-        if tdmode<=1:
-            if posSide=='long':
-                api['method']['side']='sell'
+        if tdmode <= 1:
+            if posSide == 'long':
+                api['method']['side'] = 'sell'
             else:
-                api['method']['side']='buy'
+                api['method']['side'] = 'buy'
         else:
-            api['method']['side']='sell'
-        if sl >0 and tp>0:
-            api['method']['ordType']='oco'
+            api['method']['side'] = 'sell'
+        if sl > 0 and tp > 0:
+            api['method']['ordType'] = 'oco'
         else:
-            api['method']['ordType']='conditional'
-        if sltp_type==1:
-            api['method']['sz']=str(size)
+            api['method']['ordType'] = 'conditional'
+        if sltp_type == 1:
+            api['method']['sz'] = str(size)
         else:
-            api['method']['closeFraction']='1'    
-        if tp>0:
-            api['method']['tpTriggerPx']=str(tp)
-            api['method']['tpOrdPx']='-1'
-        if sl>0:
-            api['method']['slTriggerPx']=str(sl)
-            api['method']['slOrdPx']='-1'
+            api['method']['closeFraction'] = '1'
+        if tp > 0:
+            api['method']['tpTriggerPx'] = str(tp)
+            api['method']['tpOrdPx'] = '-1'
+        if sl > 0:
+            api['method']['slTriggerPx'] = str(sl)
+            api['method']['slOrdPx'] = '-1'
         response = await self.send_request(api)
         result = json.loads(response)
         if 'code' in result and result['code'] == "0":
@@ -414,6 +416,7 @@ class OkxSdk(SDKBase):
         else:
             return response
     # tp为0即删除止盈
+
     async def modify_swap_sl_tp(self, symbol: str, size: float, algoClOrdId: str, sl: float, tp: float):
         api = {
             "method": "POST",
@@ -437,13 +440,13 @@ class OkxSdk(SDKBase):
             return (result['data'][0]['algoClOrdId'],)
         else:
             return response
-        
-    async def get_swap_history_by_subpos(self,symbol:str,subPos):
-        _subpos=0
-        if isinstance(subPos,str):
-            _subpos=int(subPos)-1
-        elif isinstance(subPos,list):
-            _subpos=int(sorted(subPos, key=lambda x: int(x))[0])-1
+
+    async def get_swap_history_by_subpos(self, symbol: str, subPos):
+        _subpos = 0
+        if isinstance(subPos, str):
+            _subpos = int(subPos)-1
+        elif isinstance(subPos, list):
+            _subpos = int(sorted(subPos, key=lambda x: int(x))[0])-1
         api = {
             "method": "GET",
             "url": "/api/v5/copytrading/subpositions-history",
@@ -457,23 +460,20 @@ class OkxSdk(SDKBase):
         response = await self.send_request(api)
         result = json.loads(response)
         if 'code' in result and result['code'] == "0":
-            if isinstance(subPos,str):
+            if isinstance(subPos, str):
                 for i in result['data']:
-                    if i['subPosId']==subPos:
+                    if i['subPosId'] == subPos:
                         return float(i['pnl'])
             else:
-                pnl=0.0
+                pnl = 0.0
                 for i in subPos:
                     for x in result['data']:
-                        if i==x['subPosId']:
-                            pnl+= float(x['pnl'])
+                        if i == x['subPosId']:
+                            pnl += float(x['pnl'])
                             break
-                return pnl        
+                return pnl
         else:
             return response
-        
-
-        
 
     async def make_spot_order(self, symbol: str, size: float, orderType: int = 0, price: float = 0):
         api = {
@@ -490,7 +490,7 @@ class OkxSdk(SDKBase):
         }
         if orderType == 1:
             api['payload']['px'] = str(price)
-       
+
         response = await self.send_request(api)
         result = json.loads(response)
         if 'code' in result and result['code'] == "0":
@@ -604,7 +604,6 @@ class OkxSdk(SDKBase):
             return soi
         else:
             return response
-        
 
     # async def make_algo(self,symbol,tdMode,side,sz,posSide,sl=None,tp=None):
     #     api = {
@@ -666,7 +665,7 @@ class OkxSdk(SDKBase):
                 elif s == 'partially_effective':
                     soi.status = 2
                 else:
-                    soi.status=-1    
+                    soi.status = -1
             return soi
         else:
             return response
@@ -695,8 +694,8 @@ class OkxSdk(SDKBase):
                 'type': '0',
                 'ccy': 'USDT',
                 'amt': str(usdt),
-                'from': '6' if fromType == 1 else '18',
-                'to': '6' if toType == 1 else '18',
+                'from': '6' if fromType == 0 else '18',
+                'to': '6' if toType == 0 else '18',
             }
         }
         response = await self.send_request(api)
@@ -705,7 +704,7 @@ class OkxSdk(SDKBase):
             return (result['data'][0]['transId'],)
         else:
             return response
-        
+
     async def get_saving_funding(self):
         api = {
             "method": "GET",
@@ -717,11 +716,12 @@ class OkxSdk(SDKBase):
         response = await self.send_request(api)
         result = json.loads(response)
         if 'code' in result and result['code'] == "0":
-            if len(result['data'])>0:
+            if len(result['data']) > 0:
                 return float(result['data'][0]['amt'])
             return 0
         else:
             return response
+
     async def get_asset_balance(self):
         api = {
             "method": "GET",
@@ -733,12 +733,13 @@ class OkxSdk(SDKBase):
         response = await self.send_request(api)
         result = json.loads(response)
         if 'code' in result and result['code'] == "0":
-            if len(result['data'])>0:
+            if len(result['data']) > 0:
                 return float(result['data'][0]['bal'])
             return 0
         else:
-            return response    
-    async def close_swap_by_pos(self,symbol:str,posSide:str,mgnMode:str):
+            return response
+
+    async def close_swap_by_pos(self, symbol: str, posSide: str, mgnMode: str):
         api = {
             "method": "POST",
             "url": "/api/v5/trade/close-position",
@@ -746,7 +747,7 @@ class OkxSdk(SDKBase):
                 'instId': symbol,
                 'posSide': posSide,
                 'mgnMode': mgnMode,
-                'autoCxl':True
+                'autoCxl': True
             }
         }
         response = await self.send_request(api)
@@ -755,8 +756,8 @@ class OkxSdk(SDKBase):
             return True
         else:
             return response
-        
-    async def cancel_algo(self,symbol,id):
+
+    async def cancel_algo(self, symbol, id):
         api = {
             "method": "POST",
             "url": "/api/v5/trade/cancel-algos",
@@ -771,7 +772,8 @@ class OkxSdk(SDKBase):
             return True
         else:
             return response
-    async def set_sltp_by_copytrader(self,subposId:str,sl:float,tp:float):
+
+    async def set_sltp_by_copytrader(self, subposId: str, sl: float, tp: float):
         api = {
             "method": "POST",
             "url": "/api/v5/copytrading/algo-order",
@@ -779,28 +781,29 @@ class OkxSdk(SDKBase):
                 'subPosId': subposId
             }
         }
-        if sl>0:
-            api['payload']['slTriggerPx']=str(sl)
+        if sl > 0:
+            api['payload']['slTriggerPx'] = str(sl)
         # else:
-        #     api['payload']['slTriggerPx']='0' 
-        if tp>0:
-            api['payload']['tpTriggerPx']=str(tp)
+        #     api['payload']['slTriggerPx']='0'
+        if tp > 0:
+            api['payload']['tpTriggerPx'] = str(tp)
         # else:
-        #     api['payload']['tpTriggerPx']='0'     
+        #     api['payload']['tpTriggerPx']='0'
         response = await self.send_request(api)
         result = json.loads(response)
         if 'code' in result and result['code'] == "0":
             return True
         else:
             return response
-    async def setlever(self,symbol:str,lever:int):
+
+    async def setlever(self, symbol: str, lever: int):
         api = {
             "method": "POST",
             "url": "/api/v5/account/set-leverage",
             "payload": {
                 'instId': symbol,
-                'lever':str(lever),
-                'mgnMode':'cross'
+                'lever': str(lever),
+                'mgnMode': 'cross'
             }
         }
         response = await self.send_request(api)
@@ -810,27 +813,46 @@ class OkxSdk(SDKBase):
         else:
             return response
 
-    async def get_pnl_history(self,symbol:str,starttime:datetime.datetime,isswap:bool):
+    async def get_pnl_history(self, symbol: str, starttime: datetime.datetime, isswap: bool):
         api = {
             "method": "GET",
             "url": "/api/v5/trade/fills-history",
             "payload": {
-                'instType':'SWAP' if isswap else 'SPOT',
-                'instId':symbol,
-                #'begin':str(int(starttime.timestamp()*1000))
+                'instType': 'SWAP' if isswap else 'SPOT',
+                'instId': symbol,
+                # 'begin':str(int(starttime.timestamp()*1000))
             }
         }
         response = await self.send_request(api)
         result = json.loads(response)
         if 'code' in result and result['code'] == "0":
-            li=[]
+            li = []
             for i in result['data']:
-                if i['fillPnl']!='0':
+                if i['fillPnl'] != '0':
                     li.append(float(i['fillPnl']))
-            #颠倒顺序，符合本地数据库记录的顺序        
-            if len(li)>0:
-                li=li[::-1]        
+            # 颠倒顺序，符合本地数据库记录的顺序
+            if len(li) > 0:
+                li = li[::-1]
             return li
         else:
-            return response      
+            return response
 
+    #余币宝申购/赎回
+    async def move_fedeem_simple_earn(self, usdt: float, purchase: bool):
+        api = {
+            "method": "POST",
+            "url": "/api/v5/finance/savings/purchase-redempt",
+            "payload": {
+                'ccy': 'USDT',
+                'amt': str(usdt),
+                'side': 'purchase' if purchase else "redempt",
+                'rate': '0.01'
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'code' in result and result['code'] == "0":
+            return True
+        else:
+            return response
+   

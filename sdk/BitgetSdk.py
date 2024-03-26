@@ -899,5 +899,56 @@ class BitgetSdk(SDKBase):
         else:
             return response
 
-             
-
+    #理财宝产品列表         
+    async def get_simple_earn_id(self):
+        api = {
+            "method": "GET",
+            "url": "/api/v2/earn/savings/product",
+            "payload": {
+                'coin':"USDT",
+                'filter':'available'
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'code' in result and result['code'] == "00000":
+            for i in result['data']:
+                if i['coin']=='USDT' and i['periodType']=='flexible' and i['productLevel']=='normal':
+                    return (i['productId'],)
+            return ''
+        else:
+            return response
+    #理财宝申购
+    async def move_to_simple_earn(self,productId:str,usdt:float):
+        api = {
+            "method": "POST",
+            "url": "/api/v2/earn/savings/subscribe",
+            "payload": {
+                'productId':productId,
+                'amount':str(usdt),
+                'periodType':'flexible'
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'code' in result and result['code'] == "00000":
+            return (result['data']['orderId'],)
+        else:
+            return response
+    #理财宝赎回
+    async def fedeem_simple_earn(self,productId:str,usdt:float):
+        api = {
+            "method": "POST",
+            "url": "/api/v2/earn/savings/redeem",
+            "payload": {
+                'productId':productId,
+                'amount':str(usdt),
+                'periodType':'flexible'
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'code' in result and result['code'] == "00000":
+            return (result['data']['orderId'],)
+        else:
+            return response

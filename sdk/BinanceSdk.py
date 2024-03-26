@@ -522,7 +522,7 @@ class BinanceSdk(SDKBase):
         response = await self.send_request(api)
         result = json.loads(response)
         if 'tranId' in result:
-            return (result['result'],)
+            return (result['tranId'],)
         else:
             return response
 
@@ -576,3 +576,58 @@ class BinanceSdk(SDKBase):
             return float(result['totalAmountInUSDT'])
         else:
             return response
+        
+    #获取活期产品持仓(USER_DATA)
+    async def get_simple_earn_id(self):
+        api = {
+            "method": "GET",
+            'rest': "https://api.binance.com",
+            "url": "/sapi/v1/simple-earn/flexible/position",
+            "payload": {
+                'asset':"USDT"
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'rows' in result :
+            if len(result['rows'])>0:
+                return (result['rows'][0]['productId'],)
+            return ''
+        else:
+            return response
+
+    async def move_to_simple_earn(self,productId:str,usdt:float):
+        api = {
+            "method": "POST",
+            'rest': "https://api.binance.com",
+            "url": "/sapi/v1/simple-earn/flexible/subscribe",
+            "payload": {
+                'productId':productId,
+                'amount':usdt
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'success' in result and result['success']==True:
+            return result['purchaseId']
+        else:
+            return response
+
+    async def fedeem_simple_earn(self,productId:str,usdt:float):
+        api = {
+            "method": "POST",
+            'rest': "https://api.binance.com",
+            "url": "/sapi/v1/simple-earn/flexible/redeem",
+            "payload": {
+                'productId':productId,
+                'amount':usdt
+            }
+        }
+        response = await self.send_request(api)
+        result = json.loads(response)
+        if 'success' in result and result['success']==True:
+            return result['redeemId']
+        else:
+            return response    
+        
+
