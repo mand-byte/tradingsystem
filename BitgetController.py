@@ -267,6 +267,8 @@ class BitgetController(Controller):
             raise HTTPException(
                 status_code=Status.ExchangeError.value, detail=msg)
         else:
+            if self.movingData != None and self.exdata.no_move_asset == False and self.simpleearnId != None:
+                await self.move_asset_to_future()
             size = 0
             if orderType == Const.ORDER_TYPE_MARKET:
                 mark_price = await self.sdk.request_swap_price(symbol)

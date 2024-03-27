@@ -48,5 +48,9 @@
         "TREND_SL_RATIO": 0.028
     },
     "------TransferProfit------": "每次平仓后的盈利，转移多少到现金/资金账户",
-    "TransferProfit":0.4
+    "TransferProfit":0.4,
+    "------LongRatio------": "做多时的资金比例，1时为上面设定资金的1:1，为0.8时为上面设定的0.8",
+    "LongRatio":1,
+    "------ShortRatio------": "做空时的资金比例，1时为上面设定资金的1:1，为0.8时为上面设定的0.8",
+    "ShortRatio":0.8
 }

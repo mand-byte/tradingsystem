@@ -56,10 +56,10 @@ async def make_tv_order(data):
                                     if DataStore.json_conf['Martin']['HUOXING_INVEST_USE_RATIO']:
                                         money = DataStore.swap_account[id].total * \
                                             DataStore.json_conf['Martin']['HUOXING_RATIO_INVEST']*math.pow(
-                                                1.618, num-1)
+                                                1.618, num-1)*(DataStore.json_conf['LongRatio'] if data.market_position=='long' else DataStore.json_conf['ShortRatio'])
                                         await value.make_swap_order(symbol, money, data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, 0, tp, Const.SLTP_TYPE_POS, data.tv_type)
                                     else:
-                                        await value.make_swap_order(symbol, DataStore.json_conf['Martin']['HUOXING_FIXED_INVERST'][num-1], data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, 0, tp, Const.SLTP_TYPE_POS, data.tv_type)
+                                        await value.make_swap_order(symbol, DataStore.json_conf['Martin']['HUOXING_FIXED_INVERST'][num-1]*(DataStore.json_conf['LongRatio'] if data.market_position=='long' else DataStore.json_conf['ShortRatio']), data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, 0, tp, Const.SLTP_TYPE_POS, data.tv_type)
                             except Exception as e:
                                 logger.error(
                                     f'tv {data.tv_type} make_swap_order err ={e}')
@@ -71,10 +71,10 @@ async def make_tv_order(data):
                                 if DataStore.json_conf['Martin']['HUOXING_INVEST_USE_RATIO']:
                                     money = DataStore.swap_account[id].total * \
                                         DataStore.json_conf['Martin']['HUOXING_RATIO_INVEST']*math.pow(
-                                            1.618, num-1)
+                                            1.618, num-1)*(DataStore.json_conf['LongRatio'] if data.market_position=='long' else DataStore.json_conf['ShortRatio'])
                                     await value.make_swap_order(symbol, money, data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, 0, tp, Const.SLTP_TYPE_POS, data.tv_type)
                                 else:
-                                    await value.make_swap_order(symbol, DataStore.json_conf['Martin']['HUOXING_FIXED_INVERST'][num-1], data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, 0, tp, Const.SLTP_TYPE_POS, data.tv_type)
+                                    await value.make_swap_order(symbol, DataStore.json_conf['Martin']['HUOXING_FIXED_INVERST'][num-1]*(DataStore.json_conf['LongRatio'] if data.market_position=='long' else DataStore.json_conf['ShortRatio']), data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, 0, tp, Const.SLTP_TYPE_POS, data.tv_type)
                             except Exception as e:
                                 logger.error(
                                     f'tv {data.tv_type} make_swap_order err ={e}')
@@ -141,10 +141,10 @@ async def make_tv_order(data):
                         if DataStore.json_conf['Trend']['TREND_INVEST_USE_RATIO']:
 
                             money = DataStore.swap_account[id].total * \
-                                DataStore.json_conf['Trend']['TREND_RATIO_INVEST']
+                                DataStore.json_conf['Trend']['TREND_RATIO_INVEST']*(DataStore.json_conf['LongRatio'] if data.market_position=='long' else DataStore.json_conf['ShortRatio'])
                             await value.make_swap_order(symbol, money, data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, sl, tp, Const.SLTP_TYPE_POS, data.tv_type)
                         else:
-                            await value.make_swap_order(symbol, DataStore.json_conf['Trend']['TREND_FIXED_INVEST'], data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, sl, tp, Const.SLTP_TYPE_POS, data.tv_type)
+                            await value.make_swap_order(symbol, DataStore.json_conf['Trend']['TREND_FIXED_INVEST']*(DataStore.json_conf['LongRatio'] if data.market_position=='long' else DataStore.json_conf['ShortRatio']), data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, sl, tp, Const.SLTP_TYPE_POS, data.tv_type)
                     except Exception as e:
                         logger.error(
                             f'tv {data.tv_type} make_swap_order err ={e}')

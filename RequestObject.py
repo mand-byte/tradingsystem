@@ -106,6 +106,10 @@ class SetTrendRequest(BaseModel):
 class SetProfitRequest(BaseModel):
     ratio:float    
 
+class SetLongShortRatioRequest(BaseModel):
+    long:float
+    short:float
+
 class SetTGRequest(BaseModel):
     TG_report_err:bool
     TG_report_open:bool
