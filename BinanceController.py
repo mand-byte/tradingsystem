@@ -196,7 +196,7 @@ class BinanceController(Controller):
             await DataStore.del_orderinfo(del_list)
         # 当开启无仓位转移资金到理财时，检查理财产品id，可用资金与全部资金是否相等，转移利润是否完成。
         if self.movingData == None and self.check_profit == False and self.simpleearnId != None and math.floor(swap_acc.available*1000) == math.floor(swap_acc.total*1000) and swap_acc.unrealizedPL == 0 and self.exdata.no_move_asset == False and swap_acc.total > 1 and len(swap_list) == 0:
-            await self.move_asset_to_simpleearn(math.floor(swap_acc.total*10**4)/10**4)
+            await self.move_asset_to_simpleearn(math.floor(swap_acc.total*10**2)/10**2)
 
 ################################################### swap#############################################################################################################
 
@@ -360,27 +360,33 @@ class BinanceController(Controller):
     async def close_swap_by_pos(self, symbol, posSide) -> bool:
         symbol = utils.get_swap_symbol(symbol, self.exdata.ex)
         del_info_list = []
+        size=0
         for i in DataStore.order_info[self.exdata.id]:
             if i.symbol == symbol and i.posSide == posSide and i.isswap and i.status == Const.ORDER_STATUS_FILLED:
-                result = await self.sdk.close_swap_order_by_market(i.symbol, i.size, i.posSide)
-                if isinstance(result, str):
-                    msg = f"binance close_swap_by_pos 平仓失败 info={i.to_json()}  result={result}"
-                    logger.error(msg)
-                    await TGBot.send_err_msg(msg)
-                else:
-                    msg = f'binance close_swap_by_pos 平仓成功 {i.to_json()}'
-                    logger.info(msg)
-                    await TGBot.send_close_msg(msg)
+                size +=i.size
+                del_info_list.append(i)
+               
+        if len(del_info_list)>0:
+            result = await self.sdk.close_swap_order_by_market(symbol, size, posSide)
+            if isinstance(result, str):
+                msg = f"binance close_swap_by_pos {symbol}平仓失败   err={result}"
+                logger.error(msg)
+                await TGBot.send_err_msg(msg)
+            else:
+                msg = f'binance close_swap_by_pos {symbol}平仓成功'
+                logger.info(msg)
+                await TGBot.send_close_msg(msg)
+                
+                for i in del_info_list:
                     if len(i.tp_id) > 0:
                         await self.sdk.cancel_swap_order(i.symbol, i.tp_id)
                     if len(i.sl_id) > 0:
                         await self.sdk.cancel_swap_order(i.symbol, i.sl_id)
-                    del_info_list.append(i)
-                    if DataStore.json_conf['TransferProfit'] > 0:
-                        self.check_profit = True
-                        asyncio.create_task(
-                            self.get_swap_pnl(i.symbol, result[0]))
-        await DataStore.del_orderinfo(del_info_list)
+                if DataStore.json_conf['TransferProfit'] > 0:
+                    self.check_profit = True
+                    asyncio.create_task(
+                        self.get_swap_pnl(symbol, result[0]))
+            await DataStore.del_orderinfo(del_info_list)
 
         return True
     # 设置仓位的止盈止损
@@ -812,7 +818,7 @@ class BinanceController(Controller):
             logger.error(msg)
             await TGBot.send_err_msg(msg)
             return
-
+        await asyncio.sleep(0.1)
         result = await self.sdk.move_to_simple_earn(self.simpleearnId, money)
         if isinstance(result, str):
             msg = f"binance move_asset_to_simpleearn 申购活期理财失败: result={result}"
@@ -837,11 +843,13 @@ class BinanceController(Controller):
         else:
             msg = f"binance move_asset_to_future 从活期理财提取资金{self.movingData.money}成功 redeemId={result}"
             logger.info(msg)
+        await asyncio.sleep(0.1)    
         result = await self.sdk.transfer(0, 1, self.movingData.money)
         if isinstance(result, str):
             msg = f"binance move_asset_to_future 转移资金{self.movingData.money}到合约账户失败: result={result}"
             logger.error(msg)
             await TGBot.send_err_msg(msg)
+            await self.sdk.move_to_simple_earn(self.simpleearnId, self.movingData.money)
             return
         else:
             msg = f"binance move_asset_to_future 转移资金{self.movingData.money}到合约账户成功"
@@ -849,3 +857,4 @@ class BinanceController(Controller):
         self.movingData.isdelete = True
         await MovingAssetDao.MovingAssetDB_Update(self.movingData)
         self.movingData = None
+        await asyncio.sleep(0.1) 

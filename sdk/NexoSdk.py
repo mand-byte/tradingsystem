@@ -247,8 +247,8 @@ class NexoSdk(SDKBase):
         }
         response = await self.send_request(api)
         result = json.loads(response)
-        if isinstance(result, dict) and 'id' in result:      
-            return (result['id'],)
+        if isinstance(result, dict) and 'dealId' in result:      
+            return (result['dealId'],)
         else:
             return response
 

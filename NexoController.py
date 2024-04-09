@@ -3,6 +3,7 @@ from typing import Dict, List
 import schedule
 from Controller import Controller
 from ExchangeDao import ExchangeDb
+from MovingAssetDao import MovingAssetDB
 from OrderInfoDao import OrderInfoDB
 from sdk.NexoSdk import NexoSdk
 import DataStore
@@ -24,7 +25,8 @@ class NexoController(Controller):
         self.exdata = exdata
         self.job = None
         self.job2 = None
-        self.check_profit=False
+        self.check_profit = False
+        self.movingData: MovingAssetDB = None
         
     async def init(self):
         await self.every_min_task()
@@ -258,7 +260,15 @@ class NexoController(Controller):
                 status_code=Status.ExchangeError.value, detail=msg)
 
         else:
-            await self.sdk.close_swap_order_by_market(info.symbol, info.size, info.posSide)
+            result=await self.sdk.close_swap_order_by_market(info.symbol, info.size, info.posSide)
+            if isinstance(result, str):
+                msg = f"nexo sdk close_swap_by_order 合约市价平仓失败:info={i.to_json()} err={result}"
+                logger.error(msg)
+                await TGBot.send_err_msg(msg)
+            else:
+                msg = f"nexo sdk close_swap_by_order 合约市价平仓成功:info={i.to_json()} "
+                logger.info(msg)
+                await TGBot.send_close_msg(msg)
             await DataStore.del_orderinfo(info)
             # orderInfo = await self.sdk.query_swap_order_info(info.symbol, info.orderId)
             # if isinstance(orderInfo, str):
@@ -338,9 +348,19 @@ class NexoController(Controller):
         del_info_list = []
         for i in DataStore.order_info[self.exdata.id]:
             if i.symbol == symbol and i.posSide == posSide and i.isswap:
-                del_info_list.append(i)
-                await self.sdk.close_swap_order_by_market(i.symbol, i.size, i.posSide)
-        await DataStore.del_orderinfo(del_info_list)
+                
+                result = await self.sdk.close_swap_order_by_market(i.symbol, i.size, i.posSide)
+                if isinstance(result, str):
+                    msg = f"nexo sdk close_swap_by_pos 合约市价平仓失败:info={i.to_json()} err={result}"
+                    logger.error(msg)
+                    await TGBot.send_err_msg(msg)
+                else:
+                    del_info_list.append(i) 
+        if len(del_info_list) > 0:
+            msg = f"nexo sdk close_swap_by_pos 合约市价平仓成功:info={i.to_json()}"
+            logger.info(msg)
+            await DataStore.del_orderinfo(del_info_list)
+            await TGBot.send_close_msg(msg)
         return True
 
     async def set_swap_sltp_by_pos(self, symbol, posSide, sl, tp) -> bool:

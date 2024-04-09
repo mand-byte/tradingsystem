@@ -54,7 +54,7 @@ async def make_tv_order(data):
                                     # 修改之前订单的止盈止损
                                     await value.set_swap_sltp_by_pos(symbol, data.market_position, 0, tp)
                                     if DataStore.json_conf['Martin']['HUOXING_INVEST_USE_RATIO']:
-                                        money = DataStore.swap_account[id].total * \
+                                        money = (DataStore.swap_account[id].total if DataStore.controller_list[id].movingData==None else DataStore.controller_list[id].movingData.money) * \
                                             DataStore.json_conf['Martin']['HUOXING_RATIO_INVEST']*math.pow(
                                                 1.618, num-1)*(DataStore.json_conf['LongRatio'] if data.market_position=='long' else DataStore.json_conf['ShortRatio'])
                                         await value.make_swap_order(symbol, money, data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, 0, tp, Const.SLTP_TYPE_POS, data.tv_type)
@@ -69,7 +69,7 @@ async def make_tv_order(data):
                                 await value.set_swap_sltp_by_pos(symbol, data.market_position, 0, tp)
                                 import math
                                 if DataStore.json_conf['Martin']['HUOXING_INVEST_USE_RATIO']:
-                                    money = DataStore.swap_account[id].total * \
+                                    money = (DataStore.swap_account[id].total if DataStore.controller_list[id].movingData==None else DataStore.controller_list[id].movingData.money) * \
                                         DataStore.json_conf['Martin']['HUOXING_RATIO_INVEST']*math.pow(
                                             1.618, num-1)*(DataStore.json_conf['LongRatio'] if data.market_position=='long' else DataStore.json_conf['ShortRatio'])
                                     await value.make_swap_order(symbol, money, data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, 0, tp, Const.SLTP_TYPE_POS, data.tv_type)
@@ -137,10 +137,12 @@ async def make_tv_order(data):
                     if match:
                         sl = float(match[1])                
                 for id, value in DataStore.controller_list.items():
+                    if value.exdata.no_open == True:
+                        continue
                     try:
                         if DataStore.json_conf['Trend']['TREND_INVEST_USE_RATIO']:
 
-                            money = DataStore.swap_account[id].total * \
+                            money = (DataStore.swap_account[id].total if DataStore.controller_list[id].movingData == None else DataStore.controller_list[id].movingData.money) * \
                                 DataStore.json_conf['Trend']['TREND_RATIO_INVEST']*(DataStore.json_conf['LongRatio'] if data.market_position=='long' else DataStore.json_conf['ShortRatio'])
                             await value.make_swap_order(symbol, money, data.market_position, float(data.price), Const.ORDER_TYPE_MARKET, sl, tp, Const.SLTP_TYPE_POS, data.tv_type)
                         else:

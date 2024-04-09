@@ -233,7 +233,7 @@ class BitgetController(Controller):
             for i, v in del_subpos.items():
                 asyncio.create_task(self.get_swap_pnl(i, v))
         if self.movingData == None and self.check_profit == False and self.simpleearnId != None and math.floor(swap_acc.available*1000) == math.floor(swap_acc.total*1000) and swap_acc.unrealizedPL == 0 and self.exdata.no_move_asset == False and swap_acc.total > 1 and len(swap_list) == 0:
-            await self.move_asset_to_simpleearn(math.floor(swap_acc.total*10**4)/10**4)
+            await self.move_asset_to_simpleearn(math.floor(swap_acc.total*10**2)/10**2)
     # fromType 0 为现金账户，1为合约账户
 
     async def transfer(self, fromType: int, toType: int, usdt: float):
@@ -1020,7 +1020,7 @@ class BitgetController(Controller):
             logger.error(msg)
             await TGBot.send_err_msg(msg)
             return
-
+        await asyncio.sleep(0.1)
         result = await self.sdk.move_to_simple_earn(self.simpleearnId, money)
         if isinstance(result, str):
             msg = f"bitget move_asset_to_simpleearn 申购活期理财失败: result={result}"
@@ -1041,15 +1041,16 @@ class BitgetController(Controller):
         if isinstance(result, str):
             msg = f"bitget move_asset_to_future 从活期理财提取资金{self.movingData.money}失败: result={result}"
             logger.error(msg)
-            return
         else:
             msg = f"bitget move_asset_to_future 从活期理财提取资金{self.movingData.money}成功"
             logger.info(msg)
+        await asyncio.sleep(0.1)    
         result = await self.sdk.transfer(0, 1, self.movingData.money)
         if isinstance(result, str):
             msg = f"bitget move_asset_to_future 转移资金{self.movingData.money}到合约账户失败: result={result}"
             logger.error(msg)
             await TGBot.send_err_msg(msg)
+            await self.sdk.move_to_simple_earn(self.simpleearnId, self.movingData.money)
             return
         else:
             msg = f"bitget move_asset_to_future 转移资金{self.movingData.money}到合约账户成功"
@@ -1057,3 +1058,4 @@ class BitgetController(Controller):
         self.movingData.isdelete = True
         await MovingAssetDao.MovingAssetDB_Update(self.movingData)
         self.movingData = None
+        asyncio.sleep(0.1) 
